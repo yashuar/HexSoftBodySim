@@ -7,6 +7,7 @@ import { PressureForce2D } from './forces/PressureForce2D';
 import { Integrator2D } from './Integrator2D';
 import { VolumeConstraint2D } from './constraints/VolumeConstraint2D';
 import { SpringConstraint2D } from './constraints/SpringConstraint2D';
+import { GroundConstraint2D } from './constraints/GroundConstraint2D';
 
 export class PhysicsWorld2D {
   // All soft bodies in the world
@@ -15,6 +16,7 @@ export class PhysicsWorld2D {
   // Constraints for all bodies
   volumeConstraints: VolumeConstraint2D[] = [];
   springConstraints: SpringConstraint2D[] = [];
+  groundConstraints: GroundConstraint2D[] = [];
 
   // Simulation parameters
   gravity: { x: number; y: number } = { x: 0, y: 9.81 };
@@ -26,6 +28,12 @@ export class PhysicsWorld2D {
   gravityForce: Gravity2D = new Gravity2D();
   pressureForce: PressureForce2D = new PressureForce2D();
 
+  // Ground level
+  groundY: number = 0;
+
+  // Enable or disable ground constraint
+  enableGround: boolean = true;
+
   // Add a soft body to the world and register its constraints
   addBody(body: HexSoftBody): void {
     this.bodies.push(body);
@@ -36,6 +44,10 @@ export class PhysicsWorld2D {
     // Register spring constraints for each spring
     for (const spring of body.springs) {
       this.springConstraints.push(new SpringConstraint2D(spring));
+    }
+    // Register ground constraint for this body if enabled
+    if (this.enableGround) {
+      this.groundConstraints.push(new GroundConstraint2D(body, this.groundY));
     }
   }
 
@@ -67,12 +79,17 @@ export class PhysicsWorld2D {
         sConstraint.apply();
       }
     }
-
     // 3. Integration Phase: update positions and velocities using Integrator2D
     for (const body of this.bodies) {
       Integrator2D.semiImplicitEuler(body.nodes, dt);
     }
+    // 4. Ground Constraint Phase: enforce ground after all other constraints and integration
+    if (this.enableGround) {
+      for (const gConstraint of this.groundConstraints) {
+        gConstraint.apply();
+      }
+    }
 
-    // 4. Sync Policy: (not implemented) - double-buffer, worker sync, etc.
+    // 5. Sync Policy: (not implemented) - double-buffer, worker sync, etc.
   }
 }

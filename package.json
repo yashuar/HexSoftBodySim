@@ -4,8 +4,10 @@
   "description": "2D soft-body hexagonal simulation engine",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "vite build",
     "start": "vite",
+    "preview": "vite preview",
+    "demo": "npm run build && npm run preview",
     "test": "jest"
   },
   "author": "Your Name",

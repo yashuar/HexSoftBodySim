@@ -1,4 +1,40 @@
+# Node.js
 node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build output
 dist/
-.env
+build/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
+
+# Environment
+.env
+.env.*
+
+# Misc
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# IDEs
+.idea/
+*.iml
+
+# Jupyter
+.ipynb_checkpoints/
