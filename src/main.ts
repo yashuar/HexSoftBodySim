@@ -1,132 +1,248 @@
-// main.ts: Entry point for the PhysicsEngine2D demo
-// This demo creates a hexagonal soft body, applies a mask region, and visualizes the simulation in real time.
+// main.ts: Entry point for the PhysicsEngine2D demo (PixiJS version)
 
 import { HexGridFactory } from './application/HexGridFactory';
 import { PhysicsWorld2D } from './domain/PhysicsWorld2D';
 import { SimulationCoordinator } from './application/SimulationCoordinator';
-import { WebGLRenderer2D } from './presentation/WebGLRenderer2D';
 import { MaskOverlay } from './presentation/MaskOverlay';
 import { UIController } from './presentation/UIController';
 import { MaskRegion } from './application/MaskParser';
 import { HexSoftBody } from './domain/HexSoftBody';
+import { UserConstraint2D } from './domain/constraints/UserConstraint2D';
+import { UserInteractionController } from './presentation/UserInteractionController';
+import { computeCellSpacingForGrid } from './application/HexGridUtils';
+import { PixiRenderer2D } from './presentation/pixi/PixiRenderer2D';
+import { HexGridView } from './presentation/pixi/HexGridView';
+import { SpringView } from './presentation/pixi/SpringView';
+import { PluginSystem } from './infrastructure/PluginSystem';
+import { StateManager } from './infrastructure/StateManager';
+import { CellParameters } from './domain/CellParameters';
+import { EventBus } from './infrastructure/EventBus';
+import { SIM_CONFIG } from './config';
+import { registerGlobalDebugListeners } from './debugListeners';
+import { DebugLogger } from './infrastructure/DebugLogger';
 
-// Get canvas and UI elements
-const canvas = document.getElementById('main-canvas') as HTMLCanvasElement;
-const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
-const uiPanel = document.getElementById('ui-panel') as HTMLElement;
+// Type augmentation for globalThis to allow 'world' property
+declare global {
+  // eslint-disable-next-line no-var
+  var world: PhysicsWorld2D | undefined;
+}
 
-// Create a hexagonal soft body (10x10 grid, 40px spacing)
-const defaultParams = { mass: 1, stiffness: 1, damping: 0.01 };
-const body = HexGridFactory.createHexSoftBody(10, 10, 40, defaultParams);
+// === PIXIJS RENDERER SETUP ===
+import * as PIXI from 'pixi.js';
 
-// Set the ground level (y coordinate) and enable/disable ground
-const GROUND_Y = 0; // Change this value to move the ground up or down
-const ENABLE_GROUND = true; // Set to false to disable the ground constraint
+console.log('[DEBUG] main.ts script loaded');
 
-const world = new PhysicsWorld2D();
-world.groundY = GROUND_Y;
-world.enableGround = ENABLE_GROUND;
-const coordinator = new SimulationCoordinator(world, body);
+// === STATE MANAGEMENT ===
+export interface SimulationState {
+  maskRegions: MaskRegion[];
+  defaultParams: CellParameters;
+  smoothingFrames: number;
+  desiredCellSpacing: number;
+  desiredNumCols: number;
+  desiredNumRows: number;
+  margin: number;
+}
+const simState = new StateManager<SimulationState>({
+  maskRegions: [],
+  defaultParams: { mass: 1, stiffness: 1, damping: 0.01 },
+  smoothingFrames: 5,
+  desiredCellSpacing: SIM_CONFIG.desiredCellSpacing,
+  desiredNumCols: SIM_CONFIG.desiredNumCols,
+  desiredNumRows: SIM_CONFIG.desiredNumRows,
+  margin: SIM_CONFIG.margin,
+});
 
-// Example mask region (centered polygon, higher stiffness)
-// const maskRegion: MaskRegion = {
-//   polygon: [
-//     { x: 300, y: 200 }, { x: 500, y: 200 }, { x: 550, y: 350 },
-//     { x: 400, y: 500 }, { x: 250, y: 350 }
-//   ],
-//   params: { mass: 1, stiffness: 5, damping: 0.01 },
-//   weight: 1
-// };
-
-// Set up renderer and overlay
-const renderer = new WebGLRenderer2D(canvas);
-const overlayRenderer = new MaskOverlay(overlay);
-
-// Set up UI controller
-const ui = new UIController(coordinator, 'ui-panel');
-// ui.addMaskRegion(maskRegion);
-
-// Center and fit the grid into the canvas
-function centerAndFitGrid(body: HexSoftBody, renderer: WebGLRenderer2D) {
-  // Compute bounding box of all nodes
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const node of body.nodes) {
-    if (node.position.x < minX) minX = node.position.x;
-    if (node.position.x > maxX) maxX = node.position.x;
-    if (node.position.y < minY) minY = node.position.y;
-    if (node.position.y > maxY) maxY = node.position.y;
+// === MAIN APP SETUP ===
+async function setupRenderer(): Promise<PixiRenderer2D> {
+  try {
+    const mainCanvas = document.getElementById('main-canvas') as HTMLCanvasElement | null;
+    if (!mainCanvas) {
+      throw new Error('main-canvas element not found');
+    }
+    const renderer = await PixiRenderer2D.create({ width: window.innerWidth, height: window.innerHeight, view: mainCanvas, resizeTo: window });
+    // Debug: log which canvas is being used
+    const pixiCanvas = renderer.getCanvas();
+    console.debug('[DEBUG][setupRenderer] PixiRenderer2D using canvas:', pixiCanvas, 'id:', pixiCanvas?.id);
+    return renderer;
+  } catch (err) {
+    console.error('[main.ts] Renderer creation failed:', err);
+    throw err;
   }
-  const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
-  const gridWidth = maxX - minX;
-  const gridHeight = maxY - minY;
-  const margin = 40; // px
-  const scaleX = (canvas.width - margin * 2) / gridWidth;
-  const scaleY = (canvas.height - margin * 2) / gridHeight;
-  const zoom = Math.min(scaleX, scaleY);
-  // Debug logs
-  console.log('[DEBUG] Grid bounding box:', { minX, minY, maxX, maxY });
-  console.log('[DEBUG] Grid center:', center);
-  console.log('[DEBUG] Grid size:', { gridWidth, gridHeight });
-  console.log('[DEBUG] Canvas size:', { width: canvas.width, height: canvas.height });
-  // Log CSS/display size and device pixel ratio for comparison
-  console.log('[DEBUG] Canvas CSS/display size:', { width: canvas.style.width, height: canvas.style.height });
-  console.log('[DEBUG] window.innerWidth/Height:', { width: window.innerWidth, height: window.innerHeight });
-  console.log('[DEBUG] Device Pixel Ratio:', window.devicePixelRatio);
-  console.log('[DEBUG] Calculated zoom:', zoom);
-  renderer.setCamera(center, zoom);
 }
 
-// Animation loop with pause/resume support
-let lastTime = performance.now();
-function animate() {
-  const now = performance.now();
-  const dt = Math.min((now - lastTime) / 1000, 0.033); // Clamp to 30 FPS max step
-  lastTime = now;
-  if (!(ui as any).isPaused) {
-    coordinator.step(dt * ui.simulationSpeed);
+function buildGridToFitWindow() {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const spacing = computeCellSpacingForGrid(width, height, SIM_CONFIG.desiredNumCols, SIM_CONFIG.desiredNumRows, SIM_CONFIG.margin);
+  return HexGridFactory.createHexSoftBodyToFitCanvas(width, height, spacing, SIM_CONFIG.defaultParams, SIM_CONFIG.margin);
+}
+
+function setupEventBus(): EventBus {
+  return new EventBus();
+}
+
+function setupPluginSystem(): PluginSystem {
+  return new PluginSystem();
+}
+
+function setupUIController(coordinator: SimulationCoordinator, simState: StateManager<SimulationState>, eventBus: EventBus): UIController {
+  return new UIController(coordinator, 'ui-panel', simState, eventBus);
+}
+
+function setupUserInteractionController(canvas: HTMLCanvasElement | null | undefined, body: HexSoftBody, world: PhysicsWorld2D): UserInteractionController | null {
+  if (canvas) {
+    return new UserInteractionController(
+      () => body,
+      () => world
+    );
+  } else {
+    console.warn('[UserInteractionController] Could not find canvas for interaction.');
+    return null;
   }
-  renderer.render(body);
-  // overlayRenderer.render([maskRegion]);
-  requestAnimationFrame(animate);
 }
-animate();
 
-// Responsive canvas resizing
-function resizeCanvas() {
-  const dpr = window.devicePixelRatio || 1;
-  const width = Math.round(window.innerWidth * dpr);
-  const height = Math.round(window.innerHeight * dpr);
-  canvas.width = width;
-  canvas.height = height;
-  overlay.width = width;
-  overlay.height = height;
-  canvas.style.width = window.innerWidth + 'px';
-  canvas.style.height = window.innerHeight + 'px';
-  overlay.style.width = window.innerWidth + 'px';
-  overlay.style.height = window.innerHeight + 'px';
-  centerAndFitGrid(body, renderer);
+let isSimulationCrashed = false;
+
+let current = {
+  renderer: null as PixiRenderer2D | null,
+  body: null as HexSoftBody | null,
+  world: null as PhysicsWorld2D | null,
+  hexGridView: null as HexGridView | null,
+  springView: null as SpringView | null,
+  pluginSystem: null as PluginSystem | null,
+  coordinator: null as SimulationCoordinator | null,
+  uiController: null as UIController | null,
+  animationId: 0 as number,
+  eventBus: null as EventBus | null,
+};
+
+function destroySimulation() {
+  if (current.animationId) cancelAnimationFrame(current.animationId);
+  if (current.renderer) {
+    current.renderer.removeLayer('hexGrid');
+    current.renderer.removeLayer('springs');
+  }
+  // Release pooled objects
+  if (current.body) HexSoftBody.releaseAllToPool(current.body);
+  // Optionally destroy Pixi objects, clear event listeners, etc.
+  current.body = null;
+  current.world = null;
+  current.hexGridView = null;
+  current.springView = null;
+  current.pluginSystem = null;
+  current.coordinator = null;
+  current.uiController = null;
 }
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
 
-// Ensure canvas always matches viewport size (CSS and attributes)
-function setCanvasFullscreen() {
-  canvas.style.position = 'absolute';
-  canvas.style.left = '0';
-  canvas.style.top = '0';
-  canvas.style.width = '100vw';
-  canvas.style.height = '100vh';
-  overlay.style.position = 'absolute';
-  overlay.style.left = '0';
-  overlay.style.top = '0';
-  overlay.style.width = '100vw';
-  overlay.style.height = '100vh';
+export async function initSimulation(params?: Partial<SimulationState>) {
+  destroySimulation();
+  const renderer = current.renderer ?? await setupRenderer();
+  current.renderer = renderer;
+  const canvas = renderer.getCanvas();
+  const eventBus = current.eventBus ?? setupEventBus();
+  current.eventBus = eventBus;
+  // Always get the latest state from simState, then override with any params
+  const state = { ...simState.get(), ...params };
+  const spacing = state.desiredCellSpacing;
+  const numCols = state.desiredNumCols;
+  const numRows = state.desiredNumRows;
+  const margin = state.margin;
+  // Use only defaultParams for cell/grid creation
+  const cellParams = {
+    mass: state.defaultParams.mass ?? SIM_CONFIG.globalMass,
+    stiffness: state.defaultParams.stiffness ?? SIM_CONFIG.globalStiffness,
+    damping: state.defaultParams.damping ?? SIM_CONFIG.globalDampingRatio
+  };
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const body = HexGridFactory.createHexSoftBodyToFitCanvas(width, height, spacing, cellParams, margin, numCols, numRows);
+  current.body = body;
+  if (body.nodes && body.nodes.length > 0) (globalThis as any)._debugFirstNode = body.nodes[0];
+  const world = new PhysicsWorld2D();
+  world.gravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
+  current.world = world;
+  const userInteractionController = setupUserInteractionController(canvas, body, world);
+  const hexGridView = new HexGridView(body.cells, userInteractionController!);
+  const springView = new SpringView(body.springs);
+  renderer.addLayer('hexGrid', hexGridView);
+  renderer.addLayer('springs', springView);
+  current.hexGridView = hexGridView;
+  current.springView = springView;
+  const pluginSystem = setupPluginSystem();
+  current.pluginSystem = pluginSystem;
+  const coordinator = new SimulationCoordinator(world, body, pluginSystem, eventBus);
+  current.coordinator = coordinator;
+  const uiController = setupUIController(coordinator, simState, eventBus);
+  current.uiController = uiController;
+  // Animation loop
+  isSimulationCrashed = false;
+  let lastFrameTime = 0;
+  let adaptiveFps = current.uiController?.simulationMaxFps ?? (SIM_CONFIG.maxFps ?? 60);
+  let slowFrameCount = 0;
+  let fastFrameCount = 0;
+  function animate(now?: number) {
+    if (isSimulationCrashed) return;
+    const maxFps = adaptiveFps;
+    const minFrameTime = 1000 / maxFps;
+    const time = now ?? performance.now();
+    const isPaused = current.uiController?.['isPaused'] ?? false;
+    const frameTime = time - lastFrameTime;
+    if (frameTime >= minFrameTime) {
+      if (!isPaused) {
+        hexGridView.update(body.cells);
+        springView.update(body.springs);
+        uiController.step(1/60);
+        pluginSystem.render(1/60);
+      }
+      // Adaptive FPS logic
+      if (frameTime > minFrameTime * 1.5 && adaptiveFps > 20) {
+        slowFrameCount++;
+        fastFrameCount = 0;
+        if (slowFrameCount > 10) { adaptiveFps = Math.max(20, adaptiveFps - 10); slowFrameCount = 0; }
+      } else if (frameTime < minFrameTime * 0.7 && adaptiveFps < 120) {
+        fastFrameCount++;
+        slowFrameCount = 0;
+        if (fastFrameCount > 30) { adaptiveFps = Math.min(120, adaptiveFps + 10); fastFrameCount = 0; }
+      } else {
+        slowFrameCount = 0;
+        fastFrameCount = 0;
+      }
+      lastFrameTime = time;
+    }
+    current.animationId = requestAnimationFrame(animate);
+  }
+  animate();
 }
-setCanvasFullscreen();
 
-// If grid parameters change (e.g., body is recreated), call centerAndFitGrid again
-// Example: after changing grid size or spacing
-// body = HexGridFactory.createHexSoftBody(...);
-// centerAndFitGrid(body, renderer);
+// Expose for UIController
+(window as any).resetSimulation = () => initSimulation();
+(window as any).resetSimulationWithParams = (params: Partial<SimulationState>) => initSimulation(params);
 
-// Optionally, add more UI controls and event listeners for mask editing, parameter adjustment, etc.
+// For integration tests: export an initApp function
+export async function initApp({ canvas, overlay, uiPanel }: { canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, uiPanel: HTMLElement }) {
+  // Minimal headless setup for integration tests
+  const renderer = await PixiRenderer2D.create({ width: canvas.width, height: canvas.height, view: canvas });
+  const defaultParams = { mass: 0.01, stiffness: 0.01, damping: 0.01 };
+  const margin = 40;
+  const spacing = computeCellSpacingForGrid(canvas.width, canvas.height, 20, 15, margin);
+  const body = HexGridFactory.createHexSoftBodyToFitCanvas(canvas.width, canvas.height, spacing, defaultParams, margin);
+  globalThis.world = new PhysicsWorld2D();
+  const userInteractionController = new UserInteractionController(() => body, () => globalThis.world!);
+  const hexGridView = new HexGridView(body.cells, userInteractionController);
+  const springView = new SpringView(body.springs);
+  renderer.addLayer('hexGrid', hexGridView);
+  renderer.addLayer('springs', springView);
+  return { renderer, hexGridView, springView, body };
+}
+
+// Add robust error logging and step-by-step debug output
+(async () => {
+  console.debug('[DEBUG] main.ts: Invoking start()');
+  try {
+    await initSimulation();
+    console.debug('[DEBUG] main.ts: start() completed successfully');
+  } catch (err) {
+    console.error('[ERROR] main.ts: start() failed:', err);
+  }
+})();
+

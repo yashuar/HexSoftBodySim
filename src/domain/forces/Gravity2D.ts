@@ -2,18 +2,32 @@
 // Can be attached to any set of nodes.
 
 import { PointMass2D } from '../PointMass2D';
+import { SIM_CONFIG } from '../../config';
+import { DebugLogger } from '../../infrastructure/DebugLogger';
 
 export class Gravity2D {
   gravity: { x: number; y: number };
 
-  constructor(gravity: { x: number; y: number } = { x: 0, y: 9.81 }) {
+  constructor(gravity: { x: number; y: number } = { x: 0, y: 1 }) {
     this.gravity = gravity;
   }
 
   // Apply gravity to a set of nodes
   apply(nodes: PointMass2D[]): void {
+    // Use global config if available
+    const gravity = SIM_CONFIG.gravity || this.gravity;
+    // Clamp gravity to safe range
+    const safeGravity = {
+      x: Math.max(-10, Math.min(gravity.x, 10)),
+      y: Math.max(-10, Math.min(gravity.y, 10))
+    };
     for (const node of nodes) {
-      node.applyForce({ x: this.gravity.x * node.mass, y: this.gravity.y * node.mass });
+      const fx = safeGravity.x * node.mass;
+      const fy = safeGravity.y * node.mass;
+      if (Math.abs(fx) > 1e3 || Math.abs(fy) > 1e3) {
+        DebugLogger.log('gravity', 'Gravity force explosion', { fx, fy, gravity: safeGravity, mass: node.mass, node });
+      }
+      node.applyForce({ x: fx, y: fy });
     }
   }
 }

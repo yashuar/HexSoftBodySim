@@ -8,6 +8,8 @@ import { Integrator2D } from './Integrator2D';
 import { VolumeConstraint2D } from './constraints/VolumeConstraint2D';
 import { SpringConstraint2D } from './constraints/SpringConstraint2D';
 import { GroundConstraint2D } from './constraints/GroundConstraint2D';
+import { UserConstraint2D } from './constraints/UserConstraint2D';
+import { SimulationStepper } from './SimulationStepper';
 
 export class PhysicsWorld2D {
   // All soft bodies in the world
@@ -18,8 +20,11 @@ export class PhysicsWorld2D {
   springConstraints: SpringConstraint2D[] = [];
   groundConstraints: GroundConstraint2D[] = [];
 
+  // User-defined constraints
+  userConstraints: UserConstraint2D[] = [];
+
   // Simulation parameters
-  gravity: { x: number; y: number } = { x: 0, y: 9.81 };
+  gravity: { x: number; y: number } = { x: 0, y: 0 };
   globalPressure: number = 0;
   maxDt: number = 0.033; // 30 FPS default
   iterationBudget: number = 5;
@@ -51,45 +56,34 @@ export class PhysicsWorld2D {
     }
   }
 
+  // FPS logging state
+  private _lastFpsLogTime: number = 0;
+  private _frameCount: number = 0;
+  private _lastDt: number = 0;
+
   // Main simulation step (multi-stage solver)
   simulateStep(dt: number): void {
-    // Clamp dt for stability
-    dt = Math.min(dt, this.maxDt);
-
-    // 1. Force Phase: apply external and internal forces
-    for (const body of this.bodies) {
-      // Apply gravity using modular force generator
-      this.gravityForce.apply(body.nodes);
-      // Apply Mooney-Rivlin (hyperelastic) forces at cell level
-      body.applyMooneyRivlinForces();
-      // Apply spring forces (linear, non-linear, strain-stiffening)
-      body.applySpringForces();
-      // Apply pressure force to each cell
-      for (const cell of body.cells) {
-        this.pressureForce.apply(cell);
-      }
+    // FPS and dt logging, once per second
+    this._frameCount++;
+    this._lastDt = dt;
+    const now = performance.now();
+    if (now - this._lastFpsLogTime >= 1000) {
+      const fps = this._frameCount / ((now - this._lastFpsLogTime) / 1000);
+      console.log(`[DEBUG][PhysicsWorld2D] FPS: ${fps.toFixed(1)}, dt: ${this._lastDt}`);
+      this._lastFpsLogTime = now;
+      this._frameCount = 0;
     }
-
-    // 2. Constraint Phase: enforce constraints (e.g., volume, springs)
-    for (let iter = 0; iter < this.iterationBudget; iter++) {
-      for (const vConstraint of this.volumeConstraints) {
-        vConstraint.apply();
-      }
-      for (const sConstraint of this.springConstraints) {
-        sConstraint.apply();
-      }
-    }
-    // 3. Integration Phase: update positions and velocities using Integrator2D
-    for (const body of this.bodies) {
-      Integrator2D.semiImplicitEuler(body.nodes, dt);
-    }
-    // 4. Ground Constraint Phase: enforce ground after all other constraints and integration
-    if (this.enableGround) {
-      for (const gConstraint of this.groundConstraints) {
-        gConstraint.apply();
-      }
-    }
-
-    // 5. Sync Policy: (not implemented) - double-buffer, worker sync, etc.
+    SimulationStepper.step({
+      bodies: this.bodies,
+      gravityForce: this.gravityForce,
+      pressureForce: this.pressureForce,
+      volumeConstraints: this.volumeConstraints,
+      springConstraints: this.springConstraints,
+      userConstraints: this.userConstraints,
+      groundConstraints: this.groundConstraints,
+      enableGround: this.enableGround,
+      iterationBudget: this.iterationBudget,
+      maxDt: this.maxDt,
+    }, dt);
   }
 }

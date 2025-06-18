@@ -1,0 +1,8 @@
+The following test files are legacy/empty and have been removed from the test suite:
+- WebGLRenderer2D.test.ts
+- WebGLRenderer2D.integration.test.ts
+- WebGLRenderer2D.output.integration.test.ts
+- Integration_GridCameraInteraction.test.ts
+- UserInteractionController.test.ts
+
+If you need to restore them, check version control history.

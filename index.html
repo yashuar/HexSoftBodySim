@@ -10,16 +10,20 @@
   <!-- Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    body {
-      margin: 0;
+    html, body {
       font-family: 'Roboto', Arial, sans-serif;
       background: #f5f5f5;
-      color: #222;
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden; /* Prevent scrolling */
     }
     #main-canvas, #overlay-canvas {
-      position: absolute;
-      left: 0; top: 0;
-      width: 100vw; height: 100vh;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
       display: block;
       z-index: 1;
     }
@@ -28,29 +32,89 @@
       z-index: 2;
     }
     #ui-panel {
-      position: absolute;
-      top: 24px; right: 24px;
-      width: 320px;
+      position: fixed;
+      top: 32px;
+      right: 32px;
+      min-width: 56px;
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      padding: 24px 20px 16px 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
       z-index: 10;
       display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      transition: width 0.2s, padding 0.2s;
+      overflow: visible;
+      padding: 0;
+    }
+    #panel-toggle-col {
+      display: flex;
       flex-direction: column;
-      gap: 18px;
+      align-items: center;
+      justify-content: flex-start;
+      min-width: 56px;
+      width: 56px;
+      height: 100%;
+      background: transparent;
+      padding: 20px 0 0 0;
+    }
+    #panel-content-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 20px 16px 12px 16px;
+      width: 340px;
+      transition: width 0.2s, padding 0.2s, opacity 0.2s;
+      background: #fff;
+      border-radius: 0 16px 16px 0;
+      box-shadow: none;
+      max-height: 92vh;
+      overflow: hidden;
+    }
+    #parameter-panel-mount {
+      max-height: 54vh;
+      overflow-y: auto;
+      margin-bottom: 0;
+      padding-right: 2px;
+    }
+    #panel-content-col.collapsed {
+      width: 0;
+      padding: 0;
+      opacity: 0;
+      pointer-events: none;
+      overflow: hidden;
+      min-width: 0;
+      max-width: 0;
+      display: flex;
+    }
+    #toggle-panel-btn {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 0;
+      background: transparent;
+      color: #1976d2;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+    #toggle-panel-btn:hover {
+      background: #e3eaf6;
     }
     .mui-btn {
       background: #1976d2;
       color: #fff;
       border: none;
       border-radius: 4px;
-      padding: 10px 18px;
+      padding: 12px 20px;
       font-size: 1rem;
       font-weight: 500;
       cursor: pointer;
       transition: background 0.2s;
-      box-shadow: 0 1px 3px rgba(25, 118, 210, 0.08);
+      box-shadow: 0 2px 6px rgba(25, 118, 210, 0.10);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -61,23 +125,106 @@
     .mui-slider {
       width: 100%;
       margin: 8px 0 0 0;
+      accent-color: #1976d2;
     }
     .mui-label {
-      font-size: 0.95rem;
-      color: #555;
+      font-size: 1rem;
+      color: #333;
       margin-bottom: 4px;
       font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     .mui-row {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
+      gap: 16px;
+      margin-bottom: 12px;
     }
     .mui-divider {
       border: none;
-      border-top: 1px solid #eee;
-      margin: 12px 0;
+      border-top: 1px solid #e0e0e0;
+      margin: 16px 0;
+    }
+    .mui-section-header {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1976d2;
+      margin: 18px 0 6px 0;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mui-tooltip {
+      position: relative;
+      cursor: help;
+    }
+    .mui-tooltip .mui-tooltip-text {
+      visibility: hidden;
+      width: max-content;
+      background: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 4px;
+      padding: 6px 10px;
+      position: absolute;
+      z-index: 100;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+    .mui-tooltip:hover .mui-tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+    .mui-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .mui-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .mui-slider-value {
+      min-width: 36px;
+      text-align: right;
+      font-size: 0.98rem;
+      color: #1976d2;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+    /* Snackbar */
+    #snackbar {
+      visibility: hidden;
+      min-width: 240px;
+      background-color: #323232;
+      color: #fff;
+      text-align: center;
+      border-radius: 4px;
+      padding: 16px;
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+      z-index: 1000;
+      font-size: 1rem;
+      opacity: 0;
+      transition: opacity 0.3s, bottom 0.3s;
+    }
+    #snackbar.show {
+      visibility: visible;
+      opacity: 1;
+      bottom: 60px;
     }
   </style>
 </head>
@@ -85,27 +232,51 @@
   <canvas id="main-canvas"></canvas>
   <canvas id="overlay-canvas"></canvas>
   <div id="ui-panel">
-    <div class="mui-row" style="justify-content: space-between;">
-      <span style="font-size:1.2rem;font-weight:500;">PhysicsEngine2D</span>
-      <button class="mui-btn" id="pause-btn"><span class="material-icons">pause</span>Pause</button>
+    <div id="panel-toggle-col">
+      <button id="toggle-panel-btn" aria-label="Toggle config panel"><span class="material-icons" id="toggle-panel-icon">chevron_right</span></button>
     </div>
-    <hr class="mui-divider">
-    <div>
-      <div class="mui-label">Simulation Speed</div>
-      <input type="range" min="0.1" max="2" step="0.01" value="1" class="mui-slider" id="speed-slider">
+    <div id="panel-content-col">
+      <div class="mui-row" style="justify-content: space-between; align-items: flex-start;">
+        <span style="font-size:1.3rem;font-weight:600;letter-spacing:0.5px;">PhysicsEngine2D</span>
+        <button class="mui-btn" id="pause-btn" title="Pause or resume simulation"><span class="material-icons">pause</span>Pause</button>
+      </div>
+      <hr class="mui-divider">
+      <div class="mui-section-header"><span class="material-icons" style="font-size:1.1em;">tune</span>Simulation Parameters</div>
+      <!-- ParameterPanel will inject all parameter controls here -->
+      <div id="parameter-panel-mount"></div>
+      <hr class="mui-divider">
+      <div class="mui-section-header"><span class="material-icons" style="font-size:1.1em;">settings_backup_restore</span>Actions</div>
+      <div class="mui-row" style="gap:12px;">
+        <button class="mui-btn" id="reset-btn" title="Reset simulation and parameters"><span class="material-icons">replay</span>Reset Simulation</button>
+        <button class="mui-btn" id="add-mask-btn" title="Add a new mask region"><span class="material-icons">add</span>Add Mask Region</button>
+      </div>
     </div>
-    <div>
-      <div class="mui-label">Stiffness</div>
-      <input type="range" min="0.1" max="10" step="0.1" value="1" class="mui-slider" id="stiffness-slider">
-    </div>
-    <div>
-      <div class="mui-label">Damping</div>
-      <input type="range" min="0" max="0.2" step="0.001" value="0.01" class="mui-slider" id="damping-slider">
-    </div>
-    <hr class="mui-divider">
-    <button class="mui-btn" id="reset-btn"><span class="material-icons">replay</span>Reset</button>
-    <button class="mui-btn" id="add-mask-btn"><span class="material-icons">add</span>Add Mask Region</button>
   </div>
+  <div id="snackbar"></div>
   <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Toggle panel collapse/expand
+    const panelContentCol = document.getElementById('panel-content-col');
+    const toggleBtn = document.getElementById('toggle-panel-btn');
+    const toggleIcon = document.getElementById('toggle-panel-icon');
+    let collapsed = false;
+    toggleBtn.addEventListener('click', () => {
+      collapsed = !collapsed;
+      if (collapsed) {
+        panelContentCol.classList.add('collapsed');
+        toggleIcon.textContent = 'chevron_left';
+      } else {
+        panelContentCol.classList.remove('collapsed');
+        toggleIcon.textContent = 'chevron_right';
+      }
+    });
+    // Snackbar for reset action
+    const snackbar = document.getElementById('snackbar');
+    window.showSnackbar = function(message) {
+      snackbar.textContent = message;
+      snackbar.className = 'show';
+      setTimeout(() => { snackbar.className = snackbar.className.replace('show', ''); }, 2500);
+    };
+  </script>
 </body>
 </html>

@@ -2,37 +2,25 @@
 // Converts image/polygon mask data into per-cell parameter values.
 
 import { HexCell } from '../domain/HexCell';
+import { CellParameters } from '../domain/CellParameters';
+import { CellParameterUtils } from '../domain/CellParameterUtils';
 
 export interface MaskRegion {
-  polygon: { x: number; y: number }[]; // Polygonal mask region
-  params: { mass?: number; stiffness?: number; damping?: number };
-  weight?: number; // Optional blending weight
+  polygon: { x: number; y: number }[];
+  params: Partial<CellParameters>;
+  weight?: number;
 }
 
 export class MaskParser {
   // For each cell, sample all mask regions and blend parameters
-  static applyMaskToCells(maskRegions: MaskRegion[], cells: HexCell[], defaultParams: { mass: number; stiffness: number; damping: number }) {
+  static applyMaskToCells(maskRegions: MaskRegion[], cells: HexCell[], defaultParams: CellParameters) {
     for (const cell of cells) {
-      let totalWeight = 0;
-      let blended = { mass: 0, stiffness: 0, damping: 0 };
-      for (const region of maskRegions) {
-        if (MaskParser.cellInPolygon(cell, region.polygon)) {
-          const w = region.weight ?? 1;
-          if (region.params.mass !== undefined) blended.mass += region.params.mass * w;
-          if (region.params.stiffness !== undefined) blended.stiffness += region.params.stiffness * w;
-          if (region.params.damping !== undefined) blended.damping += region.params.damping * w;
-          totalWeight += w;
-        }
-      }
-      if (totalWeight > 0) {
-        cell.updateParameters({
-          mass: blended.mass / totalWeight,
-          stiffness: blended.stiffness / totalWeight,
-          damping: blended.damping / totalWeight
-        });
-      } else {
-        cell.updateParameters(defaultParams);
-      }
+      // Collect all regions that include this cell
+      const blends = maskRegions
+        .filter(region => MaskParser.cellInPolygon(cell, region.polygon))
+        .map(region => ({ params: region.params, weight: region.weight ?? 1 }));
+      const blended = CellParameterUtils.blend(blends, defaultParams);
+      cell.updateParameters(blended);
     }
   }
 

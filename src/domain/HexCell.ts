@@ -4,6 +4,7 @@
 // Cells may also store references to their neighbors or indices for mesh traversal.
 
 import { PointMass2D } from './PointMass2D';
+import { CellParameters } from './CellParameters';
 
 export class HexCell {
   // The six corner nodes of the hexagon (ordered, e.g., clockwise)
@@ -30,9 +31,7 @@ export class HexCell {
   constructor(
     nodes: PointMass2D[],
     center: { x: number; y: number },
-    mass: number = 1.0,
-    stiffness: number = 1.0,
-    damping: number = 0.01,
+    params: CellParameters = { mass: 0.01, stiffness: 0.01, damping: 0.01 },
     index?: { q: number; r: number }
   ) {
     if (nodes.length !== 6) {
@@ -40,9 +39,9 @@ export class HexCell {
     }
     this.nodes = nodes;
     this.center = { ...center };
-    this.mass = mass;
-    this.stiffness = stiffness;
-    this.damping = damping;
+    this.mass = params.mass;
+    this.stiffness = params.stiffness;
+    this.damping = params.damping;
     this.index = index;
   }
 
@@ -68,7 +67,7 @@ export class HexCell {
   }
 
   // Update cell parameters (e.g., from mask sampling)
-  updateParameters(params: { mass?: number; stiffness?: number; damping?: number }): void {
+  updateParameters(params: Partial<CellParameters>): void {
     if (params.mass !== undefined) this.mass = params.mass;
     if (params.stiffness !== undefined) this.stiffness = params.stiffness;
     if (params.damping !== undefined) this.damping = params.damping;
