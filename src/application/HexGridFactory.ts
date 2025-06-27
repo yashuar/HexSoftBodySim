@@ -80,25 +80,71 @@ export class HexGridFactory {
 
   // Create a rectangular hex grid (offset layout), centered in the canvas
   static createHexSoftBodyToFitCanvas(width: number, height: number, spacing: number, defaultParams: CellParameters, margin: number = 0, numCols?: number, numRows?: number): HexSoftBody {
-    // Compute max cols/rows that fit within the canvas, accounting for margin
-    const usableWidth = width - 2 * margin;
-    const usableHeight = height - 2 * margin;
-    // Hex width = sqrt(3) * spacing, height = 2 * spacing
+    // Use a moderate default margin if not specified
+    margin = Math.max(margin, 40);
+    // Hexagon geometry
     const hexWidth = Math.sqrt(3) * spacing;
     const hexHeight = 2 * spacing;
     const vertSpacing = 0.75 * hexHeight; // vertical distance between centers
-    const cols = numCols ?? Math.floor(usableWidth / hexWidth);
-    const rows = numRows ?? Math.floor(usableHeight / vertSpacing);
-    // Compute total grid size in pixels
-    const gridWidth = cols * hexWidth + hexWidth / 2;
-    const gridHeight = rows * vertSpacing + hexHeight / 2;
-    // Center offset
-    const offsetX = margin + (usableWidth - gridWidth) / 2 + hexWidth / 2;
-    const offsetY = margin + (usableHeight - gridHeight) / 2 + hexHeight / 2;
+
+    // Helper to get all 6 corners of a hex at a given center
+    function getCorners(center: {x: number, y: number}, size: number) {
+      return Array.from({ length: 6 }, (_, i) => hexCorner(center, size, i));
+    }
+
+    // Compute max cols/rows so that all corners of all cells are within bounds
+    // Conservative: ensure even the outermost corners are inside the margin
+    let maxCols = numCols ?? 1000;
+    let maxRows = numRows ?? 1000;
+    let found = false;
+    let bestCols = 0, bestRows = 0, bestOffsetX = 0, bestOffsetY = 0;
+    // Try decreasing grid sizes until one fits
+    for (let tryRows = maxRows; tryRows >= 1 && !found; tryRows--) {
+      for (let tryCols = maxCols; tryCols >= 1 && !found; tryCols--) {
+        // Compute total grid size
+        const gridWidth = tryCols * hexWidth + hexWidth / 2;
+        const gridHeight = tryRows * vertSpacing + hexHeight / 2;
+        const offsetX = margin + (width - 2 * margin - gridWidth) / 2 + hexWidth / 2;
+        const offsetY = margin + (height - 2 * margin - gridHeight) / 2 + hexHeight / 2;
+        let allInBounds = true;
+        for (let row = 0; row < tryRows && allInBounds; row++) {
+          for (let col = 0; col < tryCols && allInBounds; col++) {
+            let x = col * hexWidth + (row % 2) * (hexWidth / 2) + offsetX;
+            let y = row * vertSpacing + offsetY;
+            const corners = getCorners({x, y}, spacing);
+            for (const corner of corners) {
+              if (
+                corner.x < margin || corner.x > width - margin ||
+                corner.y < margin || corner.y > height - margin
+              ) {
+                allInBounds = false;
+                break;
+              }
+            }
+          }
+        }
+        if (allInBounds) {
+          bestCols = tryCols;
+          bestRows = tryRows;
+          bestOffsetX = offsetX;
+          bestOffsetY = offsetY;
+          found = true;
+        }
+      }
+    }
+    if (!found) {
+      throw new Error('Could not fit any hex grid in the given area with the specified margin and spacing.');
+    }
+
+    // Now build the grid with the found size and offset
+    const cols = bestCols;
+    const rows = bestRows;
+    const offsetX = bestOffsetX;
+    const offsetY = bestOffsetY;
     // Offset layout: even-q (staggered columns)
     function offsetToPixel(col: number, row: number, size: number) {
-      const x = col * hexWidth + (row % 2) * (hexWidth / 2) + offsetX;
-      const y = row * vertSpacing + offsetY;
+      let x = col * hexWidth + (row % 2) * (hexWidth / 2) + offsetX;
+      let y = row * vertSpacing + offsetY;
       return { x, y };
     }
     const nodes: PointMass2D[] = [];
@@ -109,7 +155,13 @@ export class HexGridFactory {
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const center = offsetToPixel(col, row, spacing);
-        const corners = Array.from({ length: 6 }, (_, i) => hexCorner(center, spacing, i));
+        const corners = getCorners(center, spacing);
+        // Only create cells whose corners are all within bounds
+        const allInBounds = corners.every(corner =>
+          corner.x >= margin && corner.x <= width - margin &&
+          corner.y >= margin && corner.y <= height - margin
+        );
+        if (!allInBounds) continue;
         const cellNodes: PointMass2D[] = [];
         for (const corner of corners) {
           const key = `${corner.x.toFixed(6)},${corner.y.toFixed(6)}`;
@@ -126,6 +178,11 @@ export class HexGridFactory {
         }
         // Use {q: col, r: row} for compatibility with HexCell
         const cell = new HexCell(cellNodes, center, defaultParams, { q: col, r: row });
+        // Register this cell in each node's cellRefs
+        for (const node of cellNodes) {
+          if (!node.cellRefs) node.cellRefs = [];
+          node.cellRefs.push(cell);
+        }
         cells.push(cell);
         for (let i = 0; i < 6; i++) {
           const a = cellNodes[i];

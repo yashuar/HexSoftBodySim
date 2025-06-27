@@ -10,6 +10,31 @@ import { EventBus } from '../infrastructure/EventBus';
 import { SIM_CONFIG } from '../config';
 
 export class UIController {
+  private userInteractionController?: { applyInteractionForces: () => any, getActiveAreaConstraints?: () => any[] };
+
+  public setUserInteractionController(controller: { applyInteractionForces: () => any, getActiveAreaConstraints?: () => any[] }) {
+    this.userInteractionController = controller;
+  }
+
+  /**
+   * Applies interaction forces and returns any extra constraints (e.g., area constraints from distributed drag)
+   */
+  public applyInteractionForces(): { extraVolumeConstraints?: any[] } {
+    if (this.userInteractionController && typeof this.userInteractionController.applyInteractionForces === 'function') {
+      return this.userInteractionController.applyInteractionForces();
+    }
+    return {};
+  }
+
+  /**
+   * Returns all active area constraints from the user interaction controller, if any
+   */
+  public getActiveAreaConstraints(): any[] {
+    if (this.userInteractionController && typeof this.userInteractionController.getActiveAreaConstraints === 'function') {
+      return this.userInteractionController.getActiveAreaConstraints();
+    }
+    return [];
+  }
   private coordinator: SimulationCoordinator;
   private maskRegions: MaskRegion[] = [];
   private isPaused: boolean = false;
@@ -86,6 +111,18 @@ export class UIController {
             cell.mooneyC2 = change.enableMooneyRivlin ? 0.2 : 0.0;
           }
         }
+        if (change.mooneyDamping !== undefined) {
+          // Update Mooney-Rivlin damping for all cells
+          for (const cell of this.coordinator.body.cells) {
+            cell.mooneyDamping = change.mooneyDamping;
+          }
+        }
+        if (change.mooneyMaxForce !== undefined) {
+          // Update Mooney-Rivlin max force for all cells
+          for (const cell of this.coordinator.body.cells) {
+            cell.mooneyMaxForce = change.mooneyMaxForce;
+          }
+        }
         if (change.speed !== undefined) {
           this.speed = Number(change.speed);
         }
@@ -93,7 +130,23 @@ export class UIController {
           this.maxFps = Number(change.maxFps);
         }
         // Grid/structure changes require reset to take effect
-        // (desiredCellSpacing, desiredNumCols, desiredNumRows, margin)
+        if (change.desiredCellSpacing !== undefined || 
+            change.desiredNumCols !== undefined || 
+            change.desiredNumRows !== undefined || 
+            change.margin !== undefined) {
+          // Store the grid changes for reset
+          this.simState.set({
+            desiredCellSpacing: change.desiredCellSpacing ?? this.simState.get().desiredCellSpacing,
+            desiredNumCols: change.desiredNumCols ?? this.simState.get().desiredNumCols,
+            desiredNumRows: change.desiredNumRows ?? this.simState.get().desiredNumRows,
+            margin: change.margin ?? this.simState.get().margin
+          });
+          
+          // Show notification that reset is needed
+          if (typeof (window as any).showSnackbar === 'function') {
+            (window as any).showSnackbar('Grid changes require simulation reset to take effect');
+          }
+        }
       });
     }
   }
@@ -114,7 +167,7 @@ export class UIController {
   // Step the simulation by dt
   step(dt: number): void {
     if (!this.isPaused) {
-      this.coordinator.step(dt * this.speed);
+      this.coordinator.step(dt * this.speed, this);
     }
   }
 
@@ -127,11 +180,52 @@ export class UIController {
     }
   }
 
-  // Reset simulation (re-initialize body and world)
+  // Reset simulation with smart detection of what needs to be rebuilt
   reset(): void {
-    // Pass the current simState values to initSimulation so the new simulation uses the current GUI values
     const state = this.simState.get();
-    (window as any).resetSimulationWithParams?.(state);
+    
+    // Check if grid structure needs rebuilding
+    const needsGridRebuild = this.needsGridRebuild(state);
+    
+    if (needsGridRebuild) {
+      // Full reset for grid structure changes
+      (window as any).resetSimulationWithParams?.(state);
+      if (typeof (window as any).showSnackbar === 'function') {
+        (window as any).showSnackbar('Simulation reset with new grid layout');
+      }
+    } else {
+      // Soft reset - just reset physics state without rebuilding grid
+      this.softReset();
+      if (typeof (window as any).showSnackbar === 'function') {
+        (window as any).showSnackbar('Physics state reset to default positions');
+      }
+    }
+  }
+
+  private needsGridRebuild(state: any): boolean {
+    // Compare current grid parameters with what was used to build the current grid
+    // For now, we'll assume any reset needs a rebuild, but this could be smarter
+    return true;
+  }
+
+  private softReset(): void {
+    // Reset positions and velocities without rebuilding the grid
+    if (this.coordinator?.body) {
+      for (const node of this.coordinator.body.nodes) {
+        // Reset velocities and accumulated forces
+        node.velocity = { x: 0, y: 0 };
+        node.force = { x: 0, y: 0 };
+        // Could also reset positions to original grid layout here if we stored initial positions
+      }
+      
+      // Reset spring rest lengths to defaults if needed
+      const defaultRestLength = SIM_CONFIG.globalRestLength;
+      for (const spring of this.coordinator.body.springs) {
+        if (spring.restLength !== defaultRestLength) {
+          spring.restLength = defaultRestLength;
+        }
+      }
+    }
   }
 
   // Handle parameter slider changes

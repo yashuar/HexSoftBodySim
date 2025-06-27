@@ -14,23 +14,31 @@ export class VolumeConstraint2D {
     this.stiffness = stiffness;
   }
 
-  // Apply a simple area correction force to the cell's nodes
+  // Apply a position-based area correction to the cell's nodes
   apply(): void {
+
     const currentArea = this.cell.getArea();
     const error = currentArea - this.restArea;
-    // Distribute correction force to all nodes
+    
+    if (Math.abs(error) < 1e-6) return; // Skip if area is close to target
+    
+    // Position-based correction: scale positions relative to centroid
     const centroid = this.cell.getCentroid();
+    const correctionFactor = Math.sqrt(this.restArea / Math.max(currentArea, 1e-8));
+    const dampingFactor = 0.1 * this.stiffness; // Limit correction magnitude
+    
     for (const node of this.cell.nodes) {
-      // Direction from centroid to node
+      // Vector from centroid to node
       const dx = node.position.x - centroid.x;
       const dy = node.position.y - centroid.y;
-      // Normalize
-      const len = Math.sqrt(dx * dx + dy * dy) || 1e-8;
-      const dirX = dx / len;
-      const dirY = dy / len;
-      // Apply force proportional to area error and direction
-      const forceMag = -this.stiffness * error / this.cell.nodes.length;
-      node.applyForce({ x: forceMag * dirX, y: forceMag * dirY });
+      
+      // Apply scaled correction toward target area
+      const targetX = centroid.x + dx * correctionFactor;
+      const targetY = centroid.y + dy * correctionFactor;
+      
+      // Blend current position with target position
+      node.position.x += (targetX - node.position.x) * dampingFactor;
+      node.position.y += (targetY - node.position.y) * dampingFactor;
     }
   }
 }

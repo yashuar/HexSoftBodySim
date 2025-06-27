@@ -20,13 +20,23 @@ export class DebugLogger {
   private static MAX_LOGS = 100;
   private static lastMessages: Record<string, number> = {};
   private static DEDUP_WINDOW = 2000; // ms
+  // Lowered thresholds for more aggressive anomaly logging
   private static SIGNIFICANT_THRESHOLDS: Record<DebugLogType, number> = {
-    spring: 1e5,
-    gravity: 1e4,
-    pointmass: 1e6
+    spring: 1e2,      // 100
+    gravity: 1e2,     // 100
+    pointmass: 1e2    // 100
   };
   private static criticalListeners: DebugCriticalErrorListener[] = [];
   static isCrashed: boolean = false;
+  static logLevel: 'off' | 'error' | 'warn' | 'info' | 'debug' = 'warn';
+  static categoryFilter: DebugLogType[] | null = null; // null = all
+
+  static setLevel(level: 'off' | 'error' | 'warn' | 'info' | 'debug') {
+    this.logLevel = level;
+  }
+  static setCategoryFilter(categories: DebugLogType[] | null) {
+    this.categoryFilter = categories;
+  }
 
   static addCriticalErrorListener(listener: DebugCriticalErrorListener) {
     this.criticalListeners.push(listener);
@@ -34,6 +44,7 @@ export class DebugLogger {
 
   static log(type: DebugLogType, message: string, data: any) {
     if (this.isCrashed) return;
+    if (this.categoryFilter && !this.categoryFilter.includes(type)) return;
     // Only log if a value is truly significant
     const threshold = this.SIGNIFICANT_THRESHOLDS[type] || 1e6;
     let isSignificant = false;
@@ -50,7 +61,7 @@ export class DebugLogger {
       isCritical = !isFinite(data.position?.x) || !isFinite(data.position?.y) || !isFinite(data.velocity?.x) || !isFinite(data.velocity?.y) ||
         Math.abs(data.position?.x) > threshold * 100 || Math.abs(data.position?.y) > threshold * 100 || Math.abs(data.velocity?.x) > threshold * 100 || Math.abs(data.velocity?.y) > threshold * 100;
     }
-    if (!isSignificant) return;
+    if (!isSignificant && this.logLevel !== 'debug') return;
     // Deduplicate similar messages within a short window
     const key = type + ':' + message;
     const now = Date.now();
@@ -58,14 +69,21 @@ export class DebugLogger {
     this.lastMessages[key] = now;
     const entry: DebugLogEntry = { type, message, data, timestamp: now, critical: isCritical };
     this.logs.push(entry);
-    if (isCritical) {
+    if (isCritical || this.logLevel === 'error') {
       this.isCrashed = true;
       // Notify all listeners of a critical error
       for (const listener of this.criticalListeners) {
         try { listener(entry); } catch (e) { /* ignore */ }
       }
+      // Always log critical errors immediately
+      console.error('[DebugLogger][CRITICAL]', entry, new Error().stack);
+      this.logs = [];
+      return;
     }
-    this.flush();
+    // Throttle flushes to at most once per second
+    if (now - this.lastFlush > this.FLUSH_INTERVAL || this.logs.length > this.MAX_LOGS) {
+      this.flush();
+    }
   }
 
   static flush() {
@@ -75,7 +93,11 @@ export class DebugLogger {
       acc[entry.type] = (acc[entry.type] || 0) + 1;
       return acc;
     }, {} as Record<DebugLogType, number>);
-    console.warn('[DebugLogger][Summary]', summary, 'Sample:', this.logs[0]);
+    // Only log summary if logLevel is warn/info/debug
+    if (this.logLevel === 'warn' || this.logLevel === 'info' || this.logLevel === 'debug') {
+      const lastEntry = this.logs[this.logs.length - 1];
+      console.warn('[DebugLogger][Summary]', summary, 'Last:', lastEntry);
+    }
     this.logs = [];
     this.lastFlush = Date.now();
   }

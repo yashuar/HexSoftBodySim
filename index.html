@@ -33,94 +33,182 @@
     }
     #ui-panel {
       position: fixed;
-      top: 32px;
-      right: 32px;
-      min-width: 56px;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      top: 0;
+      right: 0;
+      width: 400px;
+      height: 100vh;
+      background: transparent;
       z-index: 10;
       display: flex;
       flex-direction: row;
       align-items: flex-start;
-      transition: width 0.2s, padding 0.2s;
-      overflow: visible;
-      padding: 0;
-    }
-    #panel-toggle-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      min-width: 56px;
-      width: 56px;
-      height: 100%;
-      background: transparent;
-      padding: 20px 0 0 0;
-    }
-    #panel-content-col {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding: 20px 16px 12px 16px;
-      width: 340px;
-      transition: width 0.2s, padding 0.2s, opacity 0.2s;
-      background: #fff;
-      border-radius: 0 16px 16px 0;
-      box-shadow: none;
-      max-height: 92vh;
-      overflow: hidden;
-    }
-    #parameter-panel-mount {
-      max-height: 54vh;
-      overflow-y: auto;
-      margin-bottom: 0;
-      padding-right: 2px;
-    }
-    #panel-content-col.collapsed {
-      width: 0;
-      padding: 0;
-      opacity: 0;
+      transition: transform 0.3s ease;
       pointer-events: none;
-      overflow: hidden;
-      min-width: 0;
-      max-width: 0;
-      display: flex;
     }
-    #toggle-panel-btn {
-      min-width: 40px;
-      min-height: 40px;
-      padding: 0;
-      background: transparent;
-      color: #1976d2;
-      border: none;
+    
+    #ui-panel.hidden {
+      transform: translateX(340px);
+    }
+    
+    #panel-toggle-handle {
+      position: absolute;
+      left: -50px;
+      top: 20px;
+      width: 50px;
+      height: 100px;
+      background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+      border-radius: 8px 0 0 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 12px;
-      border-radius: 50%;
-      transition: background 0.2s;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      pointer-events: all;
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
     }
-    #toggle-panel-btn:hover {
-      background: #e3eaf6;
+    
+    #panel-toggle-handle:hover {
+      background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+      transform: translateX(-5px);
     }
-    .mui-btn {
-      background: #1976d2;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 12px 20px;
-      font-size: 1rem;
+    
+    #panel-toggle-handle .material-icons {
+      color: white;
+      font-size: 24px;
+      transition: transform 0.3s ease;
+    }
+    
+    #ui-panel.hidden #panel-toggle-handle .material-icons {
+      transform: rotate(180deg);
+    }
+    
+    #panel-drawer {
+      width: 340px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      pointer-events: all;
+      overflow: hidden;
+    }
+    
+    #panel-header {
+      background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+      color: white;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    #panel-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin: 0;
+    }
+    
+    #pause-btn {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
       font-weight: 500;
       cursor: pointer;
-      transition: background 0.2s;
-      box-shadow: 0 2px 6px rgba(25, 118, 210, 0.10);
+      transition: all 0.2s;
       display: flex;
       align-items: center;
+      gap: 6px;
+    }
+    
+    #pause-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    #panel-content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    #parameter-panel-mount {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    
+    /* Custom Scrollbar */
+    #parameter-panel-mount::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #parameter-panel-mount::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    
+    #parameter-panel-mount::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+    }
+    
+    #parameter-panel-mount::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    #panel-actions {
+      padding: 16px 20px;
+      border-top: 1px solid #e0e0e0;
+      background: #fafafa;
+    }
+    
+    .action-section-header {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #1976d2;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
       gap: 8px;
     }
+    .mui-btn {
+      background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(25, 118, 210, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
     .mui-btn:hover {
-      background: #1565c0;
+      background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+      box-shadow: 0 3px 8px rgba(25, 118, 210, 0.3);
+      transform: translateY(-1px);
+    }
+    .mui-btn:active {
+      transform: translateY(0);
     }
     .mui-slider {
       width: 100%;
@@ -158,6 +246,295 @@
       align-items: center;
       gap: 8px;
     }
+    
+    /* Modern Compact Parameter Panel Styles */
+    .parameter-panel-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .parameter-card {
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e3f2fd;
+      overflow: hidden;
+      transition: box-shadow 0.2s ease;
+    }
+    
+    .parameter-card:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+    
+    .parameter-card-header {
+      background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .card-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .card-icon {
+      font-size: 18px !important;
+    }
+    
+    .card-title {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    
+    .card-toggle-icon {
+      font-size: 18px !important;
+      transition: transform 0.2s ease;
+    }
+    
+    .card-toggle-icon.expanded {
+      transform: rotate(180deg);
+    }
+    
+    .parameter-card-content {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    
+    .parameter-card-content.expanded {
+      max-height: 500px;
+      padding: 12px 16px;
+    }
+    
+    .control-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    .control-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      color: #424242;
+    }
+    
+    .control-icon {
+      font-size: 16px !important;
+      color: #1976d2;
+    }
+    
+    .label-text {
+      font-size: 0.85rem;
+    }
+    
+    .unit-text {
+      font-size: 0.75rem;
+      color: #757575;
+      font-weight: 400;
+    }
+    
+    .control-value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #1976d2;
+      min-width: 35px;
+      text-align: right;
+      background: #e3f2fd;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    
+    .slider-container {
+      padding: 0 2px;
+    }
+    
+    .slider-input {
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      outline: none;
+      appearance: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .slider-input::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #1976d2;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(25, 118, 210, 0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .slider-input::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+      box-shadow: 0 2px 6px rgba(25, 118, 210, 0.4);
+    }
+    
+    .slider-input::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: #1976d2;
+      border-radius: 50%;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 1px 4px rgba(25, 118, 210, 0.3);
+    }
+    
+    .control-description {
+      font-size: 0.75rem;
+      color: #666;
+      line-height: 1.3;
+      padding: 4px 8px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      border-left: 2px solid #e3f2fd;
+      margin-top: 2px;
+    }
+    
+    /* Compact Toggle Switch Styles */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 20px;
+    }
+    
+    .toggle-input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 20px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    
+    .toggle-input:checked + .toggle-slider {
+      background-color: #1976d2;
+    }
+    
+    .toggle-input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+    
+    /* Compact Vector2 Control Styles */
+    .vector2-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+    
+    .vector2-component {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .component-label {
+      font-weight: 600;
+      color: #1976d2;
+      min-width: 12px;
+      font-size: 0.8rem;
+    }
+    
+    .component-value {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #1976d2;
+      min-width: 30px;
+      text-align: right;
+      background: #e3f2fd;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    
+    /* Compact Restore Button Styles */
+    .restore-button-container {
+      padding-top: 8px;
+      margin-top: 8px;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .restore-button {
+      width: 100%;
+      background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 1px 4px rgba(76, 175, 80, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    
+    .restore-button:hover {
+      background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+      box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .restore-button:active {
+      transform: translateY(0);
+    }
+    
     .mui-tooltip {
       position: relative;
       cursor: help;
@@ -231,45 +608,93 @@
 <body>
   <canvas id="main-canvas"></canvas>
   <canvas id="overlay-canvas"></canvas>
-  <div id="ui-panel">
-    <div id="panel-toggle-col">
-      <button id="toggle-panel-btn" aria-label="Toggle config panel"><span class="material-icons" id="toggle-panel-icon">chevron_right</span></button>
+  
+  <!-- Modern Drawer UI -->
+  <div id="ui-panel" class="hidden">
+    <div id="panel-toggle-handle">
+      <span class="material-icons">chevron_left</span>
     </div>
-    <div id="panel-content-col">
-      <div class="mui-row" style="justify-content: space-between; align-items: flex-start;">
-        <span style="font-size:1.3rem;font-weight:600;letter-spacing:0.5px;">PhysicsEngine2D</span>
-        <button class="mui-btn" id="pause-btn" title="Pause or resume simulation"><span class="material-icons">pause</span>Pause</button>
+    
+    <div id="panel-drawer">
+      <!-- Header -->
+      <div id="panel-header">
+        <h1 id="panel-title">PhysicsEngine2D</h1>
+        <button id="pause-btn" title="Pause or resume simulation">
+          <span class="material-icons">pause</span>
+          <span>Pause</span>
+        </button>
       </div>
-      <hr class="mui-divider">
-      <div class="mui-section-header"><span class="material-icons" style="font-size:1.1em;">tune</span>Simulation Parameters</div>
-      <!-- ParameterPanel will inject all parameter controls here -->
-      <div id="parameter-panel-mount"></div>
-      <hr class="mui-divider">
-      <div class="mui-section-header"><span class="material-icons" style="font-size:1.1em;">settings_backup_restore</span>Actions</div>
-      <div class="mui-row" style="gap:12px;">
-        <button class="mui-btn" id="reset-btn" title="Reset simulation and parameters"><span class="material-icons">replay</span>Reset Simulation</button>
-        <button class="mui-btn" id="add-mask-btn" title="Add a new mask region"><span class="material-icons">add</span>Add Mask Region</button>
+      
+      <!-- Main Content -->
+      <div id="panel-content">
+        <!-- Parameter controls will be injected here -->
+        <div id="parameter-panel-mount"></div>
+      </div>
+      
+      <!-- Actions Footer -->
+      <div id="panel-actions">
+        <div class="action-section-header">
+          <span class="material-icons">settings_backup_restore</span>
+          Actions
+        </div>
+        <div class="action-buttons">
+          <button class="mui-btn" id="reset-btn" title="Reset simulation and parameters">
+            <span class="material-icons">replay</span>
+            Reset Simulation
+          </button>
+          <button class="mui-btn" id="add-mask-btn" title="Add a new mask region">
+            <span class="material-icons">add</span>
+            Add Mask Region
+          </button>
+        </div>
       </div>
     </div>
   </div>
+  
   <div id="snackbar"></div>
   <script type="module" src="/src/main.ts"></script>
   <script>
-    // Toggle panel collapse/expand
-    const panelContentCol = document.getElementById('panel-content-col');
-    const toggleBtn = document.getElementById('toggle-panel-btn');
-    const toggleIcon = document.getElementById('toggle-panel-icon');
-    let collapsed = false;
-    toggleBtn.addEventListener('click', () => {
-      collapsed = !collapsed;
-      if (collapsed) {
-        panelContentCol.classList.add('collapsed');
-        toggleIcon.textContent = 'chevron_left';
+    // Modern Drawer Toggle
+    const uiPanel = document.getElementById('ui-panel');
+    const toggleHandle = document.getElementById('panel-toggle-handle');
+    let drawerOpen = false; // Start with drawer closed
+    
+    function toggleDrawer() {
+      drawerOpen = !drawerOpen;
+      if (drawerOpen) {
+        uiPanel.classList.remove('hidden');
       } else {
-        panelContentCol.classList.remove('collapsed');
-        toggleIcon.textContent = 'chevron_right';
+        uiPanel.classList.add('hidden');
+      }
+    }
+    
+    // Handle click
+    toggleHandle.addEventListener('click', toggleDrawer);
+    
+    // Keyboard shortcut (Tab key to toggle drawer)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        toggleDrawer();
+      }
+      
+      // Escape key to close drawer
+      if (e.key === 'Escape' && drawerOpen) {
+        drawerOpen = false;
+        uiPanel.classList.add('hidden');
       }
     });
+    
+    // Optional: Close drawer when clicking outside (but only when open)
+    document.addEventListener('click', (e) => {
+      if (drawerOpen && 
+          !uiPanel.contains(e.target) && 
+          !toggleHandle.contains(e.target)) {
+        drawerOpen = false;
+        uiPanel.classList.add('hidden');
+      }
+    });
+    
     // Snackbar for reset action
     const snackbar = document.getElementById('snackbar');
     window.showSnackbar = function(message) {

@@ -5,6 +5,7 @@
 
 import { PointMass2D } from './PointMass2D';
 import { CellParameters } from './CellParameters';
+import { SIM_CONFIG } from '../config';
 
 export class HexCell {
   // The six corner nodes of the hexagon (ordered, e.g., clockwise)
@@ -27,11 +28,15 @@ export class HexCell {
   // Mooney-Rivlin material parameters (C1, C2)
   mooneyC1: number = 1.0;
   mooneyC2: number = 0.0;
+  
+  // Mooney-Rivlin damping parameters for biological realism
+  mooneyDamping: number = SIM_CONFIG.mooneyDamping; // Viscous damping coefficient (biological tissues are viscous)
+  mooneyMaxForce: number = SIM_CONFIG.mooneyMaxForce; // Maximum force per node to prevent instability
 
   constructor(
     nodes: PointMass2D[],
     center: { x: number; y: number },
-    params: CellParameters = { mass: 0.01, stiffness: 0.01, damping: 0.01 },
+    params: CellParameters = { mass: 0.01, springFrequency: 8.0, dampingRatio: 0.3 },
     index?: { q: number; r: number }
   ) {
     if (nodes.length !== 6) {
@@ -40,8 +45,8 @@ export class HexCell {
     this.nodes = nodes;
     this.center = { ...center };
     this.mass = params.mass;
-    this.stiffness = params.stiffness;
-    this.damping = params.damping;
+    this.stiffness = params.springFrequency || 8.0; // Convert from frequency for backward compatibility
+    this.damping = params.dampingRatio || 0.3; // Convert from ratio for backward compatibility
     this.index = index;
   }
 
@@ -69,8 +74,8 @@ export class HexCell {
   // Update cell parameters (e.g., from mask sampling)
   updateParameters(params: Partial<CellParameters>): void {
     if (params.mass !== undefined) this.mass = params.mass;
-    if (params.stiffness !== undefined) this.stiffness = params.stiffness;
-    if (params.damping !== undefined) this.damping = params.damping;
+    if (params.springFrequency !== undefined) this.stiffness = params.springFrequency;
+    if (params.dampingRatio !== undefined) this.damping = params.dampingRatio;
   }
 
   // Call this after construction to set the rest shape
@@ -79,46 +84,99 @@ export class HexCell {
   }
 
   // Compute and apply Mooney-Rivlin forces to the nodes
-  // (Simplified for 2D hexagon, assumes small deformations and area preservation)
+  // Improved implementation with biological damping and stability
   applyMooneyRivlinForces(): void {
     if (this.restPositions.length !== 6) return;
-    // Compute deformation gradient F (approximate for 2D polygon)
-    // For simplicity, use centroid-based mapping
-    const Xc = this.restPositions.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
-    Xc.x /= 6; Xc.y /= 6;
-    const xc = this.nodes.reduce((acc, n) => ({ x: acc.x + n.position.x, y: acc.y + n.position.y }), { x: 0, y: 0 });
-    xc.x /= 6; xc.y /= 6;
-    // Build 2x2 matrices for rest/current edge vectors
-    let F = [[0, 0], [0, 0]];
+    
+    // Calculate current centroid and rest centroid
+    const currentCentroid = this.getCentroid();
+    const restCentroid = {
+      x: this.restPositions.reduce((sum, p) => sum + p.x, 0) / 6,
+      y: this.restPositions.reduce((sum, p) => sum + p.y, 0) / 6
+    };
+    
+    // Calculate area-based strain (biological tissues resist area changes)
+    const currentArea = this.getArea();
+    const restArea = this.calculateRestArea();
+    const areaStrain = (currentArea - restArea) / Math.max(restArea, 1e-8);
+    
+    // Calculate shape strain for each node (deviation from rest configuration)
     for (let i = 0; i < 6; i++) {
-      const X = { x: this.restPositions[i].x - Xc.x, y: this.restPositions[i].y - Xc.y };
-      const x = { x: this.nodes[i].position.x - xc.x, y: this.nodes[i].position.y - xc.y };
-      F[0][0] += x.x * X.x; F[0][1] += x.x * X.y;
-      F[1][0] += x.y * X.x; F[1][1] += x.y * X.y;
+      const restPos = this.restPositions[i];
+      const currentPos = this.nodes[i].position;
+      const currentVel = this.nodes[i].velocity;
+      
+      // Position relative to centroid (to handle translation invariance)
+      const restRelative = {
+        x: restPos.x - restCentroid.x,
+        y: restPos.y - restCentroid.y
+      };
+      const currentRelative = {
+        x: currentPos.x - currentCentroid.x,
+        y: currentPos.y - currentCentroid.y
+      };
+      
+      // Calculate strain tensor components (simplified 2D)
+      const strainX = currentRelative.x - restRelative.x;
+      const strainY = currentRelative.y - restRelative.y;
+      const shearStrain = (currentRelative.x * restRelative.y - currentRelative.y * restRelative.x) / Math.max(restArea, 1e-8);
+      
+      // Mooney-Rivlin force components
+      // C1 term: resists extension/compression
+      const c1ForceX = -this.mooneyC1 * strainX;
+      const c1ForceY = -this.mooneyC1 * strainY;
+      
+      // C2 term: resists area change and shear
+      const c2ForceX = -this.mooneyC2 * (areaStrain * strainX + 0.5 * shearStrain * restRelative.y);
+      const c2ForceY = -this.mooneyC2 * (areaStrain * strainY - 0.5 * shearStrain * restRelative.x);
+      
+      // Total elastic force
+      let totalForceX = c1ForceX + c2ForceX;
+      let totalForceY = c1ForceY + c2ForceY;
+      
+      // Apply biological damping (tissues are viscous)
+      // Damping force proportional to velocity relative to neighbors
+      let avgNeighborVelX = 0;
+      let avgNeighborVelY = 0;
+      const prevNode = this.nodes[(i + 5) % 6]; // Previous node in hexagon
+      const nextNode = this.nodes[(i + 1) % 6]; // Next node in hexagon
+      avgNeighborVelX = (prevNode.velocity.x + nextNode.velocity.x) / 2;
+      avgNeighborVelY = (prevNode.velocity.y + nextNode.velocity.y) / 2;
+      
+      const relativeVelX = currentVel.x - avgNeighborVelX;
+      const relativeVelY = currentVel.y - avgNeighborVelY;
+      
+      const dampingForceX = -this.mooneyDamping * relativeVelX;
+      const dampingForceY = -this.mooneyDamping * relativeVelY;
+      
+      // Combine elastic and damping forces
+      totalForceX += dampingForceX;
+      totalForceY += dampingForceY;
+      
+      // Clamp forces to prevent instability (biological tissues have limits)
+      const forceMagnitude = Math.sqrt(totalForceX * totalForceX + totalForceY * totalForceY);
+      if (forceMagnitude > this.mooneyMaxForce) {
+        const scale = this.mooneyMaxForce / forceMagnitude;
+        totalForceX *= scale;
+        totalForceY *= scale;
+      }
+      
+      // Apply forces to the node
+      if (isFinite(totalForceX) && isFinite(totalForceY)) {
+        this.nodes[i].applyForce({ x: totalForceX, y: totalForceY });
+      }
     }
-    // Normalize by sum of squared rest edge lengths
-    let norm = 0;
+  }
+  
+  // Helper method to calculate rest area
+  private calculateRestArea(): number {
+    if (this.restPositions.length !== 6) return 0;
+    let area = 0;
     for (let i = 0; i < 6; i++) {
-      const X = { x: this.restPositions[i].x - Xc.x, y: this.restPositions[i].y - Xc.y };
-      norm += X.x * X.x + X.y * X.y;
+      const p1 = this.restPositions[i];
+      const p2 = this.restPositions[(i + 1) % 6];
+      area += (p1.x * p2.y - p2.x * p1.y);
     }
-    if (norm > 1e-8) {
-      F[0][0] /= norm; F[0][1] /= norm;
-      F[1][0] /= norm; F[1][1] /= norm;
-    }
-    // Compute invariants I1, I2 for 2D Mooney-Rivlin
-    const I1 = F[0][0] * F[0][0] + F[0][1] * F[0][1] + F[1][0] * F[1][0] + F[1][1] * F[1][1];
-    const detF = F[0][0] * F[1][1] - F[0][1] * F[1][0];
-    const I2 = detF * detF;
-    // Mooney-Rivlin energy density: W = C1*(I1-2) + C2*(I2-1)
-    // For simplicity, apply force proportional to gradient of W wrt node positions (approximate)
-    // Here, we apply a simple force proportional to deviation from rest shape
-    for (let i = 0; i < 6; i++) {
-      const rest = this.restPositions[i];
-      const curr = this.nodes[i].position;
-      const fx = this.mooneyC1 * (curr.x - rest.x) + this.mooneyC2 * (I1 - 2) * (curr.x - rest.x);
-      const fy = this.mooneyC1 * (curr.y - rest.y) + this.mooneyC2 * (I1 - 2) * (curr.y - rest.y);
-      this.nodes[i].applyForce({ x: -fx, y: -fy });
-    }
+    return Math.abs(area) / 2;
   }
 }

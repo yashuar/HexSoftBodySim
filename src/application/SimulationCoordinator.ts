@@ -69,9 +69,9 @@ export class SimulationCoordinator {
   }
 
   // Advance the simulation by one step, including plugins
-  step(dt: number): void {
+  step(dt: number, uiController?: { applyInteractionForces: () => { extraVolumeConstraints?: any[] } }): void {
     try {
-      this.world.simulateStep(dt);
+      this.world.simulateStep(dt, uiController);
       this.pluginSystem.simulateStep(dt);
       this.pluginSystem.render(dt);
     } catch (err) {

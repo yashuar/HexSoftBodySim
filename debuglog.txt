@@ -1,0 +1,295 @@
+client:495 [vite] connecting...
+client:618 [vite] connected.
+main.ts:33 [DEBUG] main.ts script loaded
+main.ts:251 [DEBUG] main.ts: Invoking start()
+chunk-B2SISYTU.js?v=1b394ef9:2629 PixiJS Deprecation Warning: ViewSystem.view has been renamed to ViewSystem.canvasDeprecated since v8.0.0
+PixiRenderer2D.ts:35 [PIXI][DEBUG] Stage interactivity enabled and pointerdown handler attached.
+main.ts:65 [DEBUG][setupRenderer] PixiRenderer2D using canvas: <canvas id=​"main-canvas" width=​"1208" height=​"1192" style=​"touch-action:​ none;​">​ id: main-canvas
+HexGridFactory.ts:149 [DEBUG] Total valid hex cells: 300, unique springs: 969, spring set size: 969
+HexGridView.ts:23 [DEBUG][HexGridView] container children: (970) ['_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', '_Graphics', …]
+Spring2D.ts:282 [DEBUG][Spring2D][apply] {a: {…}, b: {…}, dx: 0, dy: 40, dist: 40, …}
+Spring2D.ts:282 [DEBUG][Spring2D][apply] {a: {…}, b: {…}, dx: 34.64101615137756, dy: 20, dist: 40.000000000000014, …}
+Spring2D.ts:282 [DEBUG][Spring2D][apply] {a: {…}, b: {…}, dx: 34.64101615137753, dy: -20, dist: 39.999999999999986, …}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:210 [PointMass2D][batch 2s] changes: 1, pos[min: (-36.86, 146.00), max: (-36.86, 146.00)], vel[min: (0.00, 0.02), max: (0.00, 0.02)]
+DebugLogger.ts:78 [DebugLogger][CRITICAL] {type: 'pointmass', message: 'Large values detected in node', data: {…}, timestamp: 1751061422111, critical: true} Error
+    at DebugLogger.log (http://localhost:5173/src/infrastructure/DebugLogger.ts:82:55)
+    at SimulationStepper.step (http://localhost:5173/src/domain/SimulationStepper.ts:57:23)
+    at PhysicsWorld2D.simulateStep (http://localhost:5173/src/domain/PhysicsWorld2D.ts:89:23)
+    at SimulationCoordinator.step (http://localhost:5173/src/application/SimulationCoordinator.ts:50:18)
+    at UIController.step (http://localhost:5173/src/presentation/UIController.ts:102:24)
+    at animate (http://localhost:5173/src/main.ts:154:22)
+    at initSimulation (http://localhost:5173/src/main.ts:179:3)
+    at async http://localhost:5173/src/main.ts:201:5
+log @ DebugLogger.ts:78
+step @ SimulationStepper.ts:102
+simulateStep @ PhysicsWorld2D.ts:115
+step @ SimulationCoordinator.ts:74
+step @ UIController.ts:133
+animate @ main.ts:203
+initSimulation @ main.ts:224
+await in initSimulation
+(anonymous) @ main.ts:253
+(anonymous) @ main.ts:258
+main.ts:254 [DEBUG] main.ts: start() completed successfully
+chunk-B2SISYTU.js?v=1b394ef9:7397 [Violation] 'requestAnimationFrame' handler took 78ms
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+HexGridView.ts:126 [DEBUG][HexGridView] Node[0] position: {x: -36.85884829513752, y: 146.1207710319707}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PhysicsWorld2D.ts:106 [DEBUG][PhysicsWorld2D] FPS: 30.6, dt: 0.016666666666666666
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+HexGridView.ts:126 [DEBUG][HexGridView] Node[0] position: {x: -37.79302694867447, y: 145.67736392686436}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PhysicsWorld2D.ts:106 [DEBUG][PhysicsWorld2D] FPS: 50.0, dt: 0.016666666666666666
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+HexGridView.ts:126 [DEBUG][HexGridView] Node[0] position: {x: -38.34744390316676, y: 147.2527961012421}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:210 [PointMass2D][batch 2s] changes: 64320, pos[min: (-7998.26, 0.00), max: (6939.37, 5435.77)], vel[min: (0.00, 0.02), max: (0.00, 1.62)]
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+HexGridView.ts:126 [DEBUG][HexGridView] Node[0] position: {x: -34.962524795923166, y: 150.83846056992132}
+PointMass2D.ts:107 [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+PointMass2D.ts:148 [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}
+ [DEBUG][PointMass2D][pre-integrate] {position: {…}, velocity: {…}, force: {…}, mass: 1, safeMass: 1, …}
+ [DEBUG][PointMass2D][post-integrate] {position: {…}, velocity: {…}, ax: 0, ay: 1, dt: 0.016666666666666666}

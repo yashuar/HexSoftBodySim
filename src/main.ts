@@ -44,7 +44,7 @@ export interface SimulationState {
 }
 const simState = new StateManager<SimulationState>({
   maskRegions: [],
-  defaultParams: { mass: 1, stiffness: 1, damping: 0.01 },
+  defaultParams: { mass: 1, springFrequency: 2.0, dampingRatio: 0.1 }, // Use config values for consistency
   smoothingFrames: 5,
   desiredCellSpacing: SIM_CONFIG.desiredCellSpacing,
   desiredNumCols: SIM_CONFIG.desiredNumCols,
@@ -112,6 +112,7 @@ let current = {
   pluginSystem: null as PluginSystem | null,
   coordinator: null as SimulationCoordinator | null,
   uiController: null as UIController | null,
+  userInteractionController: null as UserInteractionController | null,
   animationId: 0 as number,
   eventBus: null as EventBus | null,
 };
@@ -132,6 +133,7 @@ function destroySimulation() {
   current.pluginSystem = null;
   current.coordinator = null;
   current.uiController = null;
+  current.userInteractionController = null;
 }
 
 export async function initSimulation(params?: Partial<SimulationState>) {
@@ -150,8 +152,8 @@ export async function initSimulation(params?: Partial<SimulationState>) {
   // Use only defaultParams for cell/grid creation
   const cellParams = {
     mass: state.defaultParams.mass ?? SIM_CONFIG.globalMass,
-    stiffness: state.defaultParams.stiffness ?? SIM_CONFIG.globalStiffness,
-    damping: state.defaultParams.damping ?? SIM_CONFIG.globalDampingRatio
+    springFrequency: state.defaultParams.springFrequency ?? SIM_CONFIG.springFrequency,
+    dampingRatio: state.defaultParams.dampingRatio ?? SIM_CONFIG.dampingRatio
   };
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -162,6 +164,7 @@ export async function initSimulation(params?: Partial<SimulationState>) {
   world.gravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
   current.world = world;
   const userInteractionController = setupUserInteractionController(canvas, body, world);
+  current.userInteractionController = userInteractionController;
   const hexGridView = new HexGridView(body.cells, userInteractionController!);
   const springView = new SpringView(body.springs);
   renderer.addLayer('hexGrid', hexGridView);
@@ -173,6 +176,10 @@ export async function initSimulation(params?: Partial<SimulationState>) {
   const coordinator = new SimulationCoordinator(world, body, pluginSystem, eventBus);
   current.coordinator = coordinator;
   const uiController = setupUIController(coordinator, simState, eventBus);
+  // --- Attach the user interaction controller to the UI controller ---
+  if (userInteractionController && uiController.setUserInteractionController) {
+    uiController.setUserInteractionController(userInteractionController);
+  }
   current.uiController = uiController;
   // Animation loop
   isSimulationCrashed = false;
@@ -186,9 +193,23 @@ export async function initSimulation(params?: Partial<SimulationState>) {
     const minFrameTime = 1000 / maxFps;
     const time = now ?? performance.now();
     const isPaused = current.uiController?.['isPaused'] ?? false;
-    const frameTime = time - lastFrameTime;
+    let frameTime = time - lastFrameTime;
+    // Harden: If frameTime is too large (e.g. after tab switch or DevTools open), skip this frame to avoid simulation explosion
+    const maxAllowedFrameTime = 100; // ms (0.1s)
+    if (frameTime > maxAllowedFrameTime) {
+      if (SIM_CONFIG.enableDebugLogging) {
+        console.warn(`[main.ts] Skipping simulation step: large frameTime (${frameTime.toFixed(2)} ms)`);
+      }
+      lastFrameTime = time;
+      current.animationId = requestAnimationFrame(animate);
+      return;
+    }
     if (frameTime >= minFrameTime) {
       if (!isPaused) {
+        // Update user interaction controller for gradual release
+        if (current.userInteractionController) {
+          current.userInteractionController.update(1/60);
+        }
         // Only update views when simulation is running
         hexGridView.update(body.cells);
         springView.update(body.springs);
@@ -224,11 +245,12 @@ export async function initSimulation(params?: Partial<SimulationState>) {
 export async function initApp({ canvas, overlay, uiPanel }: { canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, uiPanel: HTMLElement }) {
   // Minimal headless setup for integration tests
   const renderer = await PixiRenderer2D.create({ width: canvas.width, height: canvas.height, view: canvas });
-  const defaultParams = { mass: 0.01, stiffness: 0.01, damping: 0.01 };
+  const defaultParams = { mass: 0.01, springFrequency: 8.0, dampingRatio: 0.02 };
   const margin = 40;
   const spacing = computeCellSpacingForGrid(canvas.width, canvas.height, 20, 15, margin);
   const body = HexGridFactory.createHexSoftBodyToFitCanvas(canvas.width, canvas.height, spacing, defaultParams, margin);
   globalThis.world = new PhysicsWorld2D();
+  globalThis.world.gravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
   const userInteractionController = new UserInteractionController(() => body, () => globalThis.world!);
   const hexGridView = new HexGridView(body.cells, userInteractionController);
   const springView = new SpringView(body.springs);

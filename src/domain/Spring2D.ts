@@ -209,8 +209,12 @@ export class Spring2D {
 
     // Non-Hookean force: F = kEff * x + k3 * x^3
     // Clamp values to avoid instability but do not overdamp
-    const safeK = Math.max(1e-6, Math.min(finalK, 1e3));
+    const safeK = Math.max(1e-6, Math.min(finalK, 100)); // Reduced max stiffness from 1e3 to 100
     const forceMag = safeK * displacement + this.nonLinearCoeff * Math.pow(displacement, 3);
+    
+    // Additional safety: clamp force magnitude to prevent explosions
+    const MAX_FORCE_MAG = 1000; // Reasonable force limit
+    const clampedForceMag = Math.max(-MAX_FORCE_MAG, Math.min(forceMag, MAX_FORCE_MAG));
 
     // Relative velocity along the spring direction
     const relVelX = this.b.velocity.x - this.a.velocity.x;
@@ -232,9 +236,32 @@ export class Spring2D {
     const b = safeDampingRatio * bCritical;
     const dampingForce = b * relVelAlongSpring;
 
-    // Total force to apply (spring + damping)
-    const fx = (forceMag + dampingForce) * dirX;
-    const fy = (forceMag + dampingForce) * dirY;
+    // Total force to apply (spring + damping) - use clamped force magnitude
+    let fx = (clampedForceMag + dampingForce) * dirX;
+    let fy = (clampedForceMag + dampingForce) * dirY;
+    
+    // Final safety check on total force
+    const totalForceMag = Math.sqrt(fx * fx + fy * fy);
+    if (!isFinite(fx) || !isFinite(fy) || !isFinite(forceMag) || !isFinite(dampingForce)) {
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('spring', 'NaN/Inf in spring force', {
+        spring: this,
+        fx, fy, forceMag, dampingForce,
+        a: { pos: { ...this.a.position }, vel: { ...this.a.velocity }, mass: this.a.mass },
+        b: { pos: { ...this.b.position }, vel: { ...this.b.velocity }, mass: this.b.mass }
+      });
+    }
+    if (totalForceMag > MAX_FORCE_MAG) {
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('spring', 'Exceeded MAX_FORCE_MAG clamp', {
+        spring: this,
+        fx, fy, forceMag, dampingForce, totalForceMag,
+        a: { pos: { ...this.a.position }, vel: { ...this.a.velocity }, mass: this.a.mass },
+        b: { pos: { ...this.b.position }, vel: { ...this.b.velocity }, mass: this.b.mass },
+        MAX_FORCE_MAG
+      });
+      const scale = MAX_FORCE_MAG / totalForceMag;
+      fx *= scale;
+      fy *= scale;
+    }
 
     // Debug: log all values for first spring connected to debug node
     if (SIM_CONFIG.enableDebugLogging && 

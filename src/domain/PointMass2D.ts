@@ -5,7 +5,10 @@ import { CellParameters } from './CellParameters';
 import { DebugLogger } from '../infrastructure/DebugLogger';
 import { SIM_CONFIG } from '../config';
 
+import type { HexCell } from './HexCell';
+
 export class PointMass2D {
+  cellRefs?: HexCell[];
   // Current position in world space
   position: { x: number; y: number };
 
@@ -71,18 +74,27 @@ export class PointMass2D {
     const oldY = this.position.y;
     const oldVx = this.velocity.x;
     const oldVy = this.velocity.y;
+    let anomaly = false;
+    
+    // Store forces for this integration step (before clearing)
+    const fx = this.force.x;
+    const fy = this.force.y;
+    
+    // Reset force accumulator BEFORE integration to avoid double-application
+    this.resetForce();
+    
     // Clamp mass to safe range
     const safeMass = Math.max(1e-6, Math.min(this.mass, 1e3));
     if (!isFinite(safeMass) || safeMass <= 0) return;
     // Acceleration = F / m
-    const ax = this.force.x / safeMass;
-    const ay = this.force.y / safeMass;
+    const ax = fx / safeMass;
+    const ay = fy / safeMass;
     // Debug: log all values before integration for first node
     if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
       const preLog = {
         position: { ...this.position },
         velocity: { ...this.velocity },
-        force: { ...this.force },
+        force: { x: fx, y: fy }, // Use stored force values
         mass: this.mass,
         safeMass,
         ax,
@@ -95,9 +107,7 @@ export class PointMass2D {
         Object.values(preLog.force).some(v => !isFinite(v) || isNaN(v));
       if (hasNaN) {
         console.error('[CRITICAL][PointMass2D][pre-integrate][NaN/Inf detected]', preLog);
-      } else {
-        console.debug('[DEBUG][PointMass2D][pre-integrate]', preLog);
-      }
+      } // Only log debug if NaN/Inf detected
     }
     // Clamp acceleration to prevent explosions (increased for high-energy soft bodies)
     const MAX_ACC = 1e5; // 100,000 m/s² - much higher limit for high-frequency springs
@@ -106,6 +116,20 @@ export class PointMass2D {
     // Update velocity
     this.velocity.x += clampedAx * dt;
     this.velocity.y += clampedAy * dt;
+    // Log if velocity changes by a large amount in one step
+    if (Math.abs(this.velocity.x - oldVx) > 50 || Math.abs(this.velocity.y - oldVy) > 50) {
+      anomaly = true;
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Large velocity change in one step', {
+        node: this,
+        oldVx,
+        oldVy,
+        newVx: this.velocity.x,
+        newVy: this.velocity.y,
+        ax,
+        ay,
+        dt
+      });
+    }
     // Apply per-point damping (should be 0 for soft-body systems)
     // In soft-body physics, damping is handled by springs to avoid double-damping
     // which kills force propagation through the mesh
@@ -116,12 +140,35 @@ export class PointMass2D {
     // Update position
     this.position.x += this.velocity.x * dt;
     this.position.y += this.velocity.y * dt;
+    // Log if position changes by a large amount in one step
+    if (Math.abs(this.position.x - oldX) > 50 || Math.abs(this.position.y - oldY) > 50) {
+      anomaly = true;
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Large position change in one step', {
+        node: this,
+        oldX,
+        oldY,
+        newX: this.position.x,
+        newY: this.position.y,
+        velocity: { ...this.velocity },
+        dt
+      });
+    }
     // Clamp position and velocity to prevent numerical explosions
     const MAX_VAL = 1e4;
+    if (Math.abs(this.position.x) > MAX_VAL || Math.abs(this.position.y) > MAX_VAL || Math.abs(this.velocity.x) > MAX_VAL || Math.abs(this.velocity.y) > MAX_VAL) {
+      anomaly = true;
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Exceeded MAX_VAL clamp', {
+        node: this,
+        position: { ...this.position },
+        velocity: { ...this.velocity },
+        MAX_VAL
+      });
+    }
     this.position.x = Math.max(-MAX_VAL, Math.min(this.position.x, MAX_VAL));
     this.position.y = Math.max(-MAX_VAL, Math.min(this.position.y, MAX_VAL));
     this.velocity.x = Math.max(-MAX_VAL, Math.min(this.velocity.x, MAX_VAL));
     this.velocity.y = Math.max(-MAX_VAL, Math.min(this.velocity.y, MAX_VAL));
+    if (anomaly && typeof DebugLogger !== 'undefined') DebugLogger.flush();
     // Debug: log all values after integration for first node
     if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
       const postLog = {
@@ -136,9 +183,7 @@ export class PointMass2D {
         Object.values(postLog.velocity).some(v => !isFinite(v) || isNaN(v));
       if (hasNaN) {
         console.error('[CRITICAL][PointMass2D][post-integrate][NaN/Inf detected]', postLog);
-      } else {
-        console.debug('[DEBUG][PointMass2D][post-integrate]', postLog);
-      }
+      } // Only log debug if NaN/Inf detected
     }
     // Condensed debug logging for instability
     if (SIM_CONFIG.enableDebugLogging && (
@@ -152,7 +197,7 @@ export class PointMass2D {
         velocity: this.velocity,
         ax,
         ay,
-        force: this.force,
+        force: { x: fx, y: fy }, // Use stored force values
         mass: this.mass,
         dt,
       });
@@ -168,7 +213,7 @@ export class PointMass2D {
         velocity: this.velocity,
         ax,
         ay,
-        force: this.force,
+        force: { x: fx, y: fy }, // Use stored force values
         mass: this.mass,
         dt,
       });
@@ -193,22 +238,15 @@ export class PointMass2D {
       PointMass2D._maxVel.x = Math.max(PointMass2D._maxVel.x, this.velocity.x);
       PointMass2D._maxVel.y = Math.max(PointMass2D._maxVel.y, this.velocity.y);
     }
-    // Log every 2 seconds (approx) - only when debug logging is enabled
+    // Log every 10 seconds (approx) - only when debug logging is enabled
     const now = Date.now();
+    const LOG_INTERVAL_MS = 10000; // 10 seconds
     if (SIM_CONFIG.enableDebugLogging &&
-      now - PointMass2D._lastLogTime > 2000 &&
+      now - PointMass2D._lastLogTime > LOG_INTERVAL_MS &&
       PointMass2D._changeCount > 0
     ) {
       console.log(
-        `[PointMass2D][batch 2s] changes: ${PointMass2D._changeCount}, pos[min: (${PointMass2D._minPos.x.toFixed(
-          2
-        )}, ${PointMass2D._minPos.y.toFixed(2)}), max: (${PointMass2D._maxPos.x.toFixed(
-          2
-        )}, ${PointMass2D._maxPos.y.toFixed(2)})], vel[min: (${PointMass2D._minVel.x.toFixed(
-          2
-        )}, ${PointMass2D._minVel.y.toFixed(2)}), max: (${PointMass2D._maxVel.x.toFixed(
-          2
-        )}, ${PointMass2D._maxVel.y.toFixed(2)})]`
+        `[PointMass2D][batch 10s] changes: ${PointMass2D._changeCount}, pos[min: (${PointMass2D._minPos.x.toFixed(2)}, ${PointMass2D._minPos.y.toFixed(2)}), max: (${PointMass2D._maxPos.x.toFixed(2)}, ${PointMass2D._maxPos.y.toFixed(2)})], vel[min: (${PointMass2D._minVel.x.toFixed(2)}, ${PointMass2D._minVel.y.toFixed(2)}), max: (${PointMass2D._maxVel.x.toFixed(2)}, ${PointMass2D._maxVel.y.toFixed(2)})]`
       );
       PointMass2D._lastLogTime = now;
       PointMass2D._changeCount = 0;
@@ -238,13 +276,12 @@ export class PointMass2D {
         console.debug('[DEBUG][PointMass2D] integrate', {
           position: this.position,
           velocity: this.velocity,
-          force: this.force,
+          force: { x: fx, y: fy }, // Use stored force values
           dt,
         });
       }
     }
-    // Reset force accumulator
-    this.resetForce();
+    // Note: Force accumulator was already reset at the beginning of integration
   }
 
   // Reset the force accumulator

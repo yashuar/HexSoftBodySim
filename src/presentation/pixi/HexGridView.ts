@@ -15,12 +15,19 @@ export class HexGridView extends PIXI.Container {
     private cachedNodes: PointMass2D[] = [];
     private lastCellCount: number = 0;
 
+    private hexCells: any[];
     constructor(hexCells: any[], private userInteraction: UserInteractionController) {
         super();
+        this.hexCells = hexCells;
         this.initHexagons(hexCells);
         this.initNodeCircles(hexCells);
+        // Listen for pointerdown on the whole container for robust node selection
+        this.eventMode = 'static';
+        this.interactive = true;
+        this.on('pointerdown', this.onGlobalPointerDown);
         // Debug: log children order
         console.debug('[DEBUG][HexGridView] container children:', this.children.map(c => c.constructor.name));
+        console.log('[INTERACTION-DEBUG][HexGridView] Constructed with', hexCells.length, 'cells');
     }
 
     private initHexagons(hexCells: any[]) {
@@ -37,33 +44,63 @@ export class HexGridView extends PIXI.Container {
         const nodes = this.getUniqueNodes(hexCells);
         nodes.forEach((node) => {
             const circle = new PIXI.Graphics();
-            circle.interactive = true;
-            circle.eventMode = 'static';
+            circle.interactive = false; // No longer handles pointerdown directly
+            circle.eventMode = 'none';
             circle.cursor = 'pointer';
             circle.hitArea = new PIXI.Circle(0, 0, 20); // Larger for debug
-            
+
             // Create the visual circle once during initialization
             circle.fill({ color: 0xff4444, alpha: 0.8 });
             circle.circle(0, 0, 10);
             circle.fill();
             circle.position.set(node.position.x, node.position.y);
-            
-            circle.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
-                const now = Date.now();
-                if (now - this.lastPointerLogTime > 1000) {
-                    console.debug('[DEBUG][HexGridView] pointerdown on node', node, 'at', e.global.x, e.global.y);
-                    this.lastPointerLogTime = now;
-                }
-                this.dragData.node = node;
-                this.dragData.pointerId = e.pointerId;
-                this.userInteraction.startDrag(node, { x: e.global.x, y: e.global.y });
-                circle.on('pointermove', this.onPointerMove);
-                circle.on('pointerup', this.onPointerUp);
-                circle.on('pointerupoutside', this.onPointerUp);
-            });
             this.addChild(circle); // Add after hexagons, so on top
             this.nodeCircles.set(node, circle);
         });
+    }
+
+    /**
+     * Listen for pointerdown anywhere on the container, and select the nearest node within a threshold.
+     */
+    private onGlobalPointerDown = (e: PIXI.FederatedPointerEvent) => {
+        const pointer = { x: e.global.x, y: e.global.y };
+        const nodes = this.getUniqueNodes(this.hexCells);
+        let minDist = Infinity;
+        let nearest: PointMass2D | null = null;
+        for (const node of nodes) {
+            const dx = node.position.x - pointer.x;
+            const dy = node.position.y - pointer.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = node;
+            }
+        }
+        const THRESHOLD = 30; // px, adjust for usability
+        if (nearest && minDist < THRESHOLD) {
+            console.log('[INTERACTION-DEBUG][HexGridView] pointerdown (global) nearest node', nearest, 'at', pointer.x, pointer.y, 'dist', minDist, 'pointerId:', e.pointerId);
+            this.dragData.node = nearest;
+            this.dragData.pointerId = e.pointerId;
+            this.userInteraction.startDrag(nearest, pointer);
+            // Listen for pointermove/up on the root stage (PixiRenderer2D.app.stage)
+            let stage = this.getRootStage();
+            if (stage) {
+                stage.on('pointermove', this.onPointerMove);
+                stage.on('pointerup', this.onPointerUp);
+                stage.on('pointerupoutside', this.onPointerUp);
+            }
+        }
+    };
+
+    /**
+     * Traverse up the parent chain to find the root stage (PIXI.Container with no parent).
+     */
+    private getRootStage(): PIXI.Container | null {
+        let obj: PIXI.Container | null = this;
+        while (obj.parent) {
+            obj = obj.parent as PIXI.Container;
+        }
+        return obj;
     }
 
     // Efficiently get unique nodes, using cache when possible
@@ -131,31 +168,20 @@ export class HexGridView extends PIXI.Container {
     }
 
     private onPointerMove = (e: PIXI.FederatedPointerEvent) => {
-        // Only log first pointermove per second
-        const now = Date.now();
-        if (this.dragData.node && this.dragData.pointerId === e.pointerId && now - this.lastPointerLogTime > 1000) {
-            console.debug('[DEBUG][HexGridView] pointermove on node', this.dragData.node, 'to', e.global.x, e.global.y);
-            this.lastPointerLogTime = now;
-        }
         if (this.dragData.node && this.dragData.pointerId === e.pointerId) {
             this.userInteraction.moveDrag({ x: e.global.x, y: e.global.y });
         }
     };
 
     private onPointerUp = (e: PIXI.FederatedPointerEvent) => {
-        // Only log first pointerup per second
-        const now = Date.now();
-        if (this.dragData.node && this.dragData.pointerId === e.pointerId && now - this.lastPointerLogTime > 1000) {
-            console.debug('[DEBUG][HexGridView] pointerup on node', this.dragData.node);
-            this.lastPointerLogTime = now;
-        }
         if (this.dragData.node && this.dragData.pointerId === e.pointerId) {
             this.userInteraction.endDrag();
-            const circle = this.nodeCircles.get(this.dragData.node);
-            if (circle) {
-                circle.off('pointermove', this.onPointerMove);
-                circle.off('pointerup', this.onPointerUp);
-                circle.off('pointerupoutside', this.onPointerUp);
+            // Remove global listeners
+            let stage = this.getRootStage();
+            if (stage) {
+                stage.off('pointermove', this.onPointerMove);
+                stage.off('pointerup', this.onPointerUp);
+                stage.off('pointerupoutside', this.onPointerUp);
             }
             this.dragData.node = null;
             this.dragData.pointerId = null;
