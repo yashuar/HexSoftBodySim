@@ -11,6 +11,10 @@ export class HexGridView extends PIXI.Container {
     private debugFrameCount = 0;
     private lastPointerLogTime = 0;
 
+    // Cached unique nodes list for performance optimization
+    private cachedNodes: PointMass2D[] = [];
+    private lastCellCount: number = 0;
+
     constructor(hexCells: any[], private userInteraction: UserInteractionController) {
         super();
         this.initHexagons(hexCells);
@@ -29,20 +33,21 @@ export class HexGridView extends PIXI.Container {
     }
 
     private initNodeCircles(hexCells: any[]) {
-        // Collect all unique nodes from all cells
-        const nodeSet = new Set<PointMass2D>();
-        for (const cell of hexCells) {
-            for (const node of cell.nodes) {
-                nodeSet.add(node);
-            }
-        }
-        const nodes = Array.from(nodeSet);
+        // Use efficient node collection method
+        const nodes = this.getUniqueNodes(hexCells);
         nodes.forEach((node) => {
             const circle = new PIXI.Graphics();
             circle.interactive = true;
             circle.eventMode = 'static';
             circle.cursor = 'pointer';
             circle.hitArea = new PIXI.Circle(0, 0, 20); // Larger for debug
+            
+            // Create the visual circle once during initialization
+            circle.fill({ color: 0xff4444, alpha: 0.8 });
+            circle.circle(0, 0, 10);
+            circle.fill();
+            circle.position.set(node.position.x, node.position.y);
+            
             circle.on('pointerdown', (e: PIXI.FederatedPointerEvent) => {
                 const now = Date.now();
                 if (now - this.lastPointerLogTime > 1000) {
@@ -61,40 +66,59 @@ export class HexGridView extends PIXI.Container {
         });
     }
 
+    // Efficiently get unique nodes, using cache when possible
+    private getUniqueNodes(hexCells: any[]): PointMass2D[] {
+        // Only rebuild cache if cell count changed (indicates grid structure change)
+        if (hexCells.length !== this.lastCellCount) {
+            const nodeSet = new Set<PointMass2D>();
+            for (const cell of hexCells) {
+                for (const node of cell.nodes) {
+                    nodeSet.add(node);
+                }
+            }
+            this.cachedNodes = Array.from(nodeSet);
+            this.lastCellCount = hexCells.length;
+        }
+        return this.cachedNodes;
+    }
+
     update(hexCells: any[]) {
-        // Update hexagons
+        // Optimized: batch hexagon drawing to reduce clear/fill/stroke calls
         for (let i = 0; i < hexCells.length; i++) {
             const cell = hexCells[i];
             const g = this.hexGraphics[i];
-            g.clear();
             const nodes = cell.nodes;
             if (nodes.length === 6) {
+                g.clear();
+                // Set style once, then draw path
+                g.fill({ color: 0x3399ff, alpha: 0.25 });
+                g.setStrokeStyle({ width: 2, color: 0x003366 });
                 g.moveTo(nodes[0].position.x, nodes[0].position.y);
                 for (let j = 1; j < 6; j++) {
                     g.lineTo(nodes[j].position.x, nodes[j].position.y);
                 }
                 g.closePath();
-                g.fill({ color: 0x3399ff, alpha: 0.25 });
-                g.setStrokeStyle({ width: 2, color: 0x003366 });
+                // Single fill and stroke operation
+                g.fill();
                 g.stroke();
             }
         }
-        // Update node circles
-        const nodeSet = new Set<PointMass2D>();
-        for (const cell of hexCells) {
-            for (const node of cell.nodes) {
-                nodeSet.add(node);
-            }
-        }
-        const nodes = Array.from(nodeSet);
+        
+        // Optimized: batch node circle updates to reduce clear/fill calls
+        const nodes = this.getUniqueNodes(hexCells);
         nodes.forEach((node) => {
             const circle = this.nodeCircles.get(node);
             if (circle) {
-                circle.clear();
-                circle.fill({ color: 0xff4444, alpha: 0.8 });
-                circle.circle(0, 0, 10);
-                circle.fill();
-                circle.position.set(node.position.x, node.position.y);
+                // Only update position if the node has moved significantly
+                const newX = node.position.x;
+                const newY = node.position.y;
+                const currentX = circle.position.x;
+                const currentY = circle.position.y;
+                
+                if (Math.abs(newX - currentX) > 0.1 || Math.abs(newY - currentY) > 0.1) {
+                    circle.position.set(newX, newY);
+                }
+                
                 // Condensed: log node[0] position every 30 frames
                 if (node === nodes[0]) {
                     this.debugFrameCount++;

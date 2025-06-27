@@ -35,10 +35,18 @@ export class HexSoftBody {
     return this.cells.reduce((sum, cell) => sum + cell.getArea(), 0);
   }
 
-  // Compute the average density (total mass / total area)
+  // Compute the average density (total mass / total area) - optimized single pass
   getAverageDensity(): number {
-    const totalMass = this.cells.reduce((sum, cell) => sum + cell.mass, 0);
-    const totalArea = this.getTotalArea();
+    let totalMass = 0;
+    let totalArea = 0;
+    
+    // Single loop to compute both mass and area
+    for (let i = 0; i < this.cells.length; i++) {
+      const cell = this.cells[i];
+      totalMass += cell.mass;
+      totalArea += cell.getArea();
+    }
+    
     return totalArea > 0 ? totalMass / totalArea : 0;
   }
 
@@ -52,11 +60,11 @@ export class HexSoftBody {
     }
   }
 
-  // Apply all spring forces
-  applySpringForces(): void {
+  // Apply all spring forces (updated to pass timestep for stability)
+  applySpringForces(dt: number = 1/60): void {
     for (const spring of this.springs) {
       if (spring.dirty) {
-        spring.apply();
+        spring.apply(dt); // Pass timestep for timestep-aware stiffness calculation
         spring.dirty = false;
       }
     }

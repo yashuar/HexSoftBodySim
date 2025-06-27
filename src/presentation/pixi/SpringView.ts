@@ -21,18 +21,30 @@ export class SpringView extends PIXI.Container {
     }
 
     update(springs: any[]) {
-        // Only update positions, do not recreate graphics
-        for (let i = 0; i < springs.length; i++) {
-            const g = this.springGraphics[i];
-            const spring = springs[i];
-            g.clear();
-            g.setStrokeStyle({ width: 2, color: 0xff00ff });
-            const a = spring.a;
-            const b = spring.b;
-            if (a && b) {
-                g.moveTo(a.position.x, a.position.y);
-                g.lineTo(b.position.x, b.position.y);
-                g.stroke();
+        // Optimized: batch all spring drawing into a single graphics object
+        // Clear all graphics once and rebuild in a single operation
+        if (this.springGraphics.length > 0) {
+            const mainGraphics = this.springGraphics[0];
+            mainGraphics.clear();
+            mainGraphics.setStrokeStyle({ width: 2, color: 0xff00ff });
+            
+            // Draw all springs as connected line segments
+            for (let i = 0; i < springs.length; i++) {
+                const spring = springs[i];
+                const a = spring.a;
+                const b = spring.b;
+                if (a && b) {
+                    mainGraphics.moveTo(a.position.x, a.position.y);
+                    mainGraphics.lineTo(b.position.x, b.position.y);
+                }
+            }
+            
+            // Single stroke call for all springs
+            mainGraphics.stroke();
+            
+            // Hide unused graphics objects
+            for (let i = 1; i < this.springGraphics.length; i++) {
+                this.springGraphics[i].visible = false;
             }
         }
     }

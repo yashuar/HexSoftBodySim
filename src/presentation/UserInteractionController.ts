@@ -18,7 +18,7 @@ export class UserInteractionController {
   // Called by HexGridView when a node drag starts
   public startDrag(node: any, pos: { x: number; y: number }) {
     console.debug('[DEBUG][UserInteractionController] startDrag', node, pos);
-    this.draggingConstraint = new UserConstraint2D(node, pos, 1000);
+    this.draggingConstraint = new UserConstraint2D(node, pos, 5000); // Much gentler - prevents extreme deformation
     this.getWorld().userConstraints = [this.draggingConstraint];
   }
 

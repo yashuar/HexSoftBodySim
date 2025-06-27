@@ -33,15 +33,39 @@ export class SimulationCoordinator {
     }
   }
 
-  // Set a global parameter (stiffness or damping) for all cells
-  setGlobalParameter(param: 'stiffness' | 'damping', value: number) {
-    for (const cell of this.body.cells) {
-      cell[param] = value;
+  // Set a global parameter for all cells - updated for frequency-based approach
+  setGlobalParameter(param: 'springFrequency' | 'dampingRatio' | 'stiffness' | 'damping', value: number) {
+    const springs = this.body.springs;
+    
+    // Handle both new frequency-based and legacy parameters
+    if (param === 'springFrequency') {
+      for (let i = 0; i < springs.length; i++) {
+        springs[i].springFrequency = value;
+      }
+    } else if (param === 'dampingRatio') {
+      for (let i = 0; i < springs.length; i++) {
+        springs[i].dampingRatio = value;
+      }
+    } else if (param === 'stiffness') {
+      // Legacy support: convert stiffness to frequency
+      for (let i = 0; i < springs.length; i++) {
+        springs[i].stiffness = value; // Uses the legacy compatibility setter
+      }
+    } else if (param === 'damping') {
+      // Legacy support: convert damping to ratio
+      for (let i = 0; i < springs.length; i++) {
+        springs[i].damping = value; // Uses the legacy compatibility setter
+      }
     }
-    // Also update all springs
-    for (const spring of this.body.springs) {
-      spring[param] = value;
-    }
+  }
+
+  // New frequency-based parameter setters (recommended approach)
+  setGlobalSpringFrequency(frequency: number) {
+    this.setGlobalParameter('springFrequency', frequency);
+  }
+
+  setGlobalDampingRatio(ratio: number) {
+    this.setGlobalParameter('dampingRatio', ratio);
   }
 
   // Advance the simulation by one step, including plugins

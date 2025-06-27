@@ -32,7 +32,7 @@ export class UserConstraint2D {
     let fx = dx * this.strength;
     let fy = dy * this.strength;
     // Clamp the force to a reasonable maximum to prevent runaway drift
-    const maxForce = 100; // You can tune this value
+    const maxForce = 1e5; // 100,000 N - much higher for responsive user interaction
     const mag = Math.sqrt(fx * fx + fy * fy);
     if (mag > maxForce) {
       fx = (fx / mag) * maxForce;

@@ -10,6 +10,7 @@ import { SpringConstraint2D } from './constraints/SpringConstraint2D';
 import { GroundConstraint2D } from './constraints/GroundConstraint2D';
 import { UserConstraint2D } from './constraints/UserConstraint2D';
 import { SimulationStepper } from './SimulationStepper';
+import { SIM_CONFIG } from '../config';
 
 export class PhysicsWorld2D {
   // All soft bodies in the world
@@ -63,15 +64,17 @@ export class PhysicsWorld2D {
 
   // Main simulation step (multi-stage solver)
   simulateStep(dt: number): void {
-    // FPS and dt logging, once per second
-    this._frameCount++;
-    this._lastDt = dt;
-    const now = performance.now();
-    if (now - this._lastFpsLogTime >= 1000) {
-      const fps = this._frameCount / ((now - this._lastFpsLogTime) / 1000);
-      console.log(`[DEBUG][PhysicsWorld2D] FPS: ${fps.toFixed(1)}, dt: ${this._lastDt}`);
-      this._lastFpsLogTime = now;
-      this._frameCount = 0;
+    // FPS and dt logging, once per second - only when debug logging is enabled
+    if (SIM_CONFIG.enableDebugLogging) {
+      this._frameCount++;
+      this._lastDt = dt;
+      const now = performance.now();
+      if (now - this._lastFpsLogTime >= 1000) {
+        const fps = this._frameCount / ((now - this._lastFpsLogTime) / 1000);
+        console.log(`[DEBUG][PhysicsWorld2D] FPS: ${fps.toFixed(1)}, dt: ${this._lastDt}`);
+        this._lastFpsLogTime = now;
+        this._frameCount = 0;
+      }
     }
     SimulationStepper.step({
       bodies: this.bodies,

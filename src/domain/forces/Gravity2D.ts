@@ -16,10 +16,10 @@ export class Gravity2D {
   apply(nodes: PointMass2D[]): void {
     // Use global config if available
     const gravity = SIM_CONFIG.gravity || this.gravity;
-    // Clamp gravity to safe range
+    // Clamp gravity to safe range (increased for high-mass soft bodies)
     const safeGravity = {
-      x: Math.max(-10, Math.min(gravity.x, 10)),
-      y: Math.max(-10, Math.min(gravity.y, 10))
+      x: Math.max(-100, Math.min(gravity.x, 100)), // ±100 m/s² for high-mass systems
+      y: Math.max(-100, Math.min(gravity.y, 100))
     };
     for (const node of nodes) {
       const fx = safeGravity.x * node.mass;

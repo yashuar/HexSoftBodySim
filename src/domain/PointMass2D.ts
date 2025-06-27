@@ -3,6 +3,7 @@
 
 import { CellParameters } from './CellParameters';
 import { DebugLogger } from '../infrastructure/DebugLogger';
+import { SIM_CONFIG } from '../config';
 
 export class PointMass2D {
   // Current position in world space
@@ -46,7 +47,7 @@ export class PointMass2D {
   constructor(
     position: { x: number; y: number },
     mass: number = 1.0,
-    damping: number = 0.01
+    damping: number = 0.0 // Set to 0 for soft-body systems - damping handled by springs
   ) {
     this.position = { ...position };
     this.velocity = { x: 0, y: 0 };
@@ -77,7 +78,7 @@ export class PointMass2D {
     const ax = this.force.x / safeMass;
     const ay = this.force.y / safeMass;
     // Debug: log all values before integration for first node
-    if (this === (globalThis as any)._debugFirstNode) {
+    if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
       const preLog = {
         position: { ...this.position },
         velocity: { ...this.velocity },
@@ -98,16 +99,20 @@ export class PointMass2D {
         console.debug('[DEBUG][PointMass2D][pre-integrate]', preLog);
       }
     }
-    // Clamp acceleration to prevent explosions
-    const MAX_ACC = 1e3;
+    // Clamp acceleration to prevent explosions (increased for high-energy soft bodies)
+    const MAX_ACC = 1e5; // 100,000 m/s² - much higher limit for high-frequency springs
     const clampedAx = Math.max(-MAX_ACC, Math.min(ax, MAX_ACC));
     const clampedAy = Math.max(-MAX_ACC, Math.min(ay, MAX_ACC));
     // Update velocity
     this.velocity.x += clampedAx * dt;
     this.velocity.y += clampedAy * dt;
-    // Apply damping
-    this.velocity.x *= 1 - this.damping;
-    this.velocity.y *= 1 - this.damping;
+    // Apply per-point damping (should be 0 for soft-body systems)
+    // In soft-body physics, damping is handled by springs to avoid double-damping
+    // which kills force propagation through the mesh
+    if (this.damping > 0) {
+      this.velocity.x *= 1 - this.damping;
+      this.velocity.y *= 1 - this.damping;
+    }
     // Update position
     this.position.x += this.velocity.x * dt;
     this.position.y += this.velocity.y * dt;
@@ -118,7 +123,7 @@ export class PointMass2D {
     this.velocity.x = Math.max(-MAX_VAL, Math.min(this.velocity.x, MAX_VAL));
     this.velocity.y = Math.max(-MAX_VAL, Math.min(this.velocity.y, MAX_VAL));
     // Debug: log all values after integration for first node
-    if (this === (globalThis as any)._debugFirstNode) {
+    if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
       const postLog = {
         position: { ...this.position },
         velocity: { ...this.velocity },
@@ -136,12 +141,12 @@ export class PointMass2D {
       }
     }
     // Condensed debug logging for instability
-    if (
+    if (SIM_CONFIG.enableDebugLogging && (
       !isFinite(this.position.x) ||
       !isFinite(this.position.y) ||
       !isFinite(this.velocity.x) ||
       !isFinite(this.velocity.y)
-    ) {
+    )) {
       DebugLogger.log('pointmass', 'NaN/Inf in PointMass2D', {
         position: this.position,
         velocity: this.velocity,
@@ -152,12 +157,12 @@ export class PointMass2D {
         dt,
       });
     }
-    if (
+    if (SIM_CONFIG.enableDebugLogging && (
       Math.abs(this.position.x) > 1e6 ||
       Math.abs(this.position.y) > 1e6 ||
       Math.abs(this.velocity.x) > 1e6 ||
       Math.abs(this.velocity.y) > 1e6
-    ) {
+    )) {
       DebugLogger.log('pointmass', 'PointMass2D explosion', {
         position: this.position,
         velocity: this.velocity,
@@ -168,14 +173,14 @@ export class PointMass2D {
         dt,
       });
     }
-    // Only accumulate if position or velocity changed significantly
+    // Only accumulate if position or velocity changed significantly AND debug logging is enabled
     const posChanged =
       Math.abs(oldX - this.position.x) > EPSILON ||
       Math.abs(oldY - this.position.y) > EPSILON;
     const velChanged =
       Math.abs(oldVx - this.velocity.x) > EPSILON ||
       Math.abs(oldVy - this.velocity.y) > EPSILON;
-    if (posChanged || velChanged) {
+    if (SIM_CONFIG.enableDebugLogging && (posChanged || velChanged)) {
       PointMass2D._changeCount++;
       // Track min/max position
       PointMass2D._minPos.x = Math.min(PointMass2D._minPos.x, this.position.x);
@@ -188,9 +193,9 @@ export class PointMass2D {
       PointMass2D._maxVel.x = Math.max(PointMass2D._maxVel.x, this.velocity.x);
       PointMass2D._maxVel.y = Math.max(PointMass2D._maxVel.y, this.velocity.y);
     }
-    // Log every 2 seconds (approx)
+    // Log every 2 seconds (approx) - only when debug logging is enabled
     const now = Date.now();
-    if (
+    if (SIM_CONFIG.enableDebugLogging &&
       now - PointMass2D._lastLogTime > 2000 &&
       PointMass2D._changeCount > 0
     ) {
@@ -224,10 +229,10 @@ export class PointMass2D {
         y: Number.NEGATIVE_INFINITY,
       };
     }
-    // Condensed: log integration for first node every 30 frames
+    // Condensed: log integration for first node every 30 frames - only when debug logging is enabled
     const DEBUG_LOG_INTERVAL = 300; // frames
     let debugFrameCount = 0;
-    if (this === (globalThis as any)._debugFirstNode) {
+    if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
       debugFrameCount++;
       if (debugFrameCount % DEBUG_LOG_INTERVAL === 0) {
         console.debug('[DEBUG][PointMass2D] integrate', {
@@ -248,7 +253,7 @@ export class PointMass2D {
     this.force.y = 0;
   }
 
-  static getFromPool(position: { x: number; y: number }, mass: number = 1.0, damping: number = 0.01): PointMass2D {
+  static getFromPool(position: { x: number; y: number }, mass: number = 1.0, damping: number = 0.0): PointMass2D {
     const obj = this._pool.pop();
     if (obj) {
       obj.position.x = position.x;
@@ -268,6 +273,7 @@ export class PointMass2D {
     this._pool.push(obj);
   }
   static fromParams(position: { x: number; y: number }, params: CellParameters): PointMass2D {
-    return this.getFromPool(position, params.mass, params.damping);
+    // For soft-body systems, per-point damping should be 0 - all damping handled by springs
+    return this.getFromPool(position, params.mass, 0.0);
   }
 }

@@ -5,7 +5,7 @@ import { SIM_CONFIG } from '../config';
 // ParameterPanel: Material-inspired UI for global simulation parameters.
 
 export type ParameterChange = {
-  stiffness?: number;
+  springFrequency?: number;
   dampingRatio?: number;
   mass?: number;
   restLength?: number;
@@ -14,12 +14,11 @@ export type ParameterChange = {
   gravityY?: number;
   enableMooneyRivlin?: boolean;
   speed?: number;
+  maxFps?: number;
   desiredCellSpacing?: number;
   desiredNumCols?: number;
   desiredNumRows?: number;
   margin?: number;
-  globalDampingRatio?: number;
-  globalStiffness?: number;
   globalMass?: number;
   globalRestLength?: number;
   globalInteractionStrength?: number;
@@ -38,9 +37,9 @@ export class ParameterPanel {
     this.container.innerHTML = '';
     // --- Section: Physics Parameters ---
     this.container.appendChild(this.sectionHeader('Physics'));
-    this.createSlider('globalDampingRatio', 0, 2, 0.01, 0.5, 'Damping Ratio', 'mui-slider', 'Controls how quickly motion is damped (0 = none, 1 = critical, 2 = overdamped)');
-    this.createSlider('globalStiffness', 0, 10, 0.01, 0.01, 'Stiffness', 'mui-slider', 'Spring stiffness (higher = stiffer springs, more force)');
-    this.createSlider('globalMass', 0.001, 10, 0.001, 0.01, 'Mass', 'mui-slider', 'Mass of each point in the simulation');
+    this.createSlider('dampingRatio', 0, 2, 0.001, 0.02, 'Damping Ratio', 'mui-slider', 'Controls how quickly motion is damped (0 = none, 1 = critical, 2 = overdamped)');
+    this.createSlider('springFrequency', 0.1, 20, 0.1, 8.0, 'Spring Frequency (Hz)', 'mui-slider', 'Spring oscillation frequency in Hz (higher = stiffer springs)');
+    this.createSlider('globalMass', 0.001, 50, 0.001, 10.0, 'Mass', 'mui-slider', 'Mass of each point in the simulation');
     this.createSlider('globalRestLength', 0.1, 2, 0.01, 1, 'Rest Length', 'mui-slider', 'Natural length of springs between points');
     this.createSlider('globalInteractionStrength', 0, 10, 0.01, 1, 'Interaction Strength', 'mui-slider', 'Strength of inter-cell forces');
     this.createSwitch('enableMooneyRivlin', 'Enable Mooney-Rivlin', 'Use Mooney-Rivlin material model for soft bodies');
@@ -73,8 +72,8 @@ export class ParameterPanel {
     restoreBtn.onclick = () => {
       // Set all controls to SIM_CONFIG defaults
       this.update({
-        globalDampingRatio: SIM_CONFIG.globalDampingRatio,
-        globalStiffness: SIM_CONFIG.globalStiffness,
+        dampingRatio: SIM_CONFIG.dampingRatio,
+        springFrequency: SIM_CONFIG.springFrequency,
         globalMass: SIM_CONFIG.globalMass,
         globalRestLength: SIM_CONFIG.globalRestLength,
         globalInteractionStrength: SIM_CONFIG.globalInteractionStrength,
@@ -89,8 +88,8 @@ export class ParameterPanel {
         smoothingFrames: 5
       });
       this.eventBus?.emit('parameterChange', {
-        globalDampingRatio: SIM_CONFIG.globalDampingRatio,
-        globalStiffness: SIM_CONFIG.globalStiffness,
+        dampingRatio: SIM_CONFIG.dampingRatio,
+        springFrequency: SIM_CONFIG.springFrequency,
         globalMass: SIM_CONFIG.globalMass,
         globalRestLength: SIM_CONFIG.globalRestLength,
         globalInteractionStrength: SIM_CONFIG.globalInteractionStrength,
@@ -183,6 +182,8 @@ export class ParameterPanel {
     wrapper.className = 'mui-row';
     wrapper.style.gap = '8px';
     wrapper.style.marginBottom = '4px';
+    wrapper.style.alignItems = 'center';
+    
     // Label with tooltip
     const labelElem = document.createElement('label');
     labelElem.className = 'mui-label mui-tooltip';
@@ -190,24 +191,24 @@ export class ParameterPanel {
     labelElem.style.fontSize = '0.93rem';
     labelElem.style.marginBottom = '0';
     labelElem.style.gap = '3px';
+    labelElem.style.flex = '1';
     labelElem.innerHTML = `${label} <span class="material-icons" style="font-size:0.95em;vertical-align:middle;">help_outline</span>`;
     const tooltipElem = document.createElement('span');
     tooltipElem.className = 'mui-tooltip-text';
     tooltipElem.textContent = tooltip;
     labelElem.appendChild(tooltipElem);
-    // Switch
-    const switchWrapper = document.createElement('span');
-    switchWrapper.className = 'mui-switch';
-    switchWrapper.style.height = '18px';
+    
+    // Checkbox styled as switch
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = key;
-    const slider = document.createElement('span');
-    slider.className = 'mui-slider';
-    switchWrapper.appendChild(checkbox);
-    // Custom switch track/knob (optional, for more Material look)
+    checkbox.style.width = '40px';
+    checkbox.style.height = '20px';
+    checkbox.style.accentColor = '#1976d2';
+    checkbox.style.cursor = 'pointer';
+    
     wrapper.appendChild(labelElem);
-    wrapper.appendChild(switchWrapper);
+    wrapper.appendChild(checkbox);
     this.container.appendChild(wrapper);
     this.controls[key] = checkbox;
   }
@@ -219,7 +220,7 @@ export class ParameterPanel {
     };
     // Sliders
     [
-      'globalDampingRatio', 'globalStiffness', 'globalMass', 'globalRestLength', 'globalInteractionStrength',
+      'dampingRatio', 'springFrequency', 'globalMass', 'globalRestLength', 'globalInteractionStrength',
       'gravityX', 'gravityY', 'desiredCellSpacing', 'desiredNumCols', 'desiredNumRows', 'margin', 'speed', 'maxFps'
     ].forEach(key => {
       const slider = this.controls[key] as HTMLInputElement;
@@ -254,10 +255,10 @@ export class ParameterPanel {
 
   update(params: Partial<ParameterChange>): void {
     const keys: (keyof ParameterChange)[] = [
-      'stiffness', 'dampingRatio', 'mass', 'restLength', 'interactionStrength',
-      'gravityX', 'gravityY', 'enableMooneyRivlin', 'speed',
+      'springFrequency', 'dampingRatio', 'mass', 'restLength', 'interactionStrength',
+      'gravityX', 'gravityY', 'enableMooneyRivlin', 'speed', 'maxFps',
       'desiredCellSpacing', 'desiredNumCols', 'desiredNumRows', 'margin',
-      'globalDampingRatio', 'globalStiffness', 'globalMass', 'globalRestLength', 'globalInteractionStrength'
+      'globalMass', 'globalRestLength', 'globalInteractionStrength'
     ];
     for (const key of keys) {
       if (Object.prototype.hasOwnProperty.call(this.controls, key) && params[key] !== undefined) {

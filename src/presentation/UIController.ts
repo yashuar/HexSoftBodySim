@@ -39,21 +39,21 @@ export class UIController {
       this.eventBus.on('parameterChange', (change) => {
         this.simState.set(change);
         // Live update for all global parameters
-        if (change.globalStiffness !== undefined) {
+        if (change.springFrequency !== undefined) {
           for (const spring of this.coordinator.body.springs) {
-            spring.stiffness = change.globalStiffness;
+            spring.springFrequency = change.springFrequency;
           }
           // Update defaultParams for resets
           const prev = this.simState.get().defaultParams;
-          this.simState.set({ defaultParams: { ...prev, stiffness: change.globalStiffness } });
+          this.simState.set({ defaultParams: { ...prev, springFrequency: change.springFrequency } });
         }
-        if (change.globalDampingRatio !== undefined) {
+        if (change.dampingRatio !== undefined) {
           for (const spring of this.coordinator.body.springs) {
-            spring.damping = change.globalDampingRatio;
+            spring.dampingRatio = change.dampingRatio;
           }
           // Update defaultParams for resets
           const prev = this.simState.get().defaultParams;
-          this.simState.set({ defaultParams: { ...prev, damping: change.globalDampingRatio } });
+          this.simState.set({ defaultParams: { ...prev, dampingRatio: change.dampingRatio } });
         }
         if (change.globalMass !== undefined) {
           for (const node of this.coordinator.body.nodes) {
@@ -103,8 +103,8 @@ export class UIController {
     this.simState.set({
       defaultParams: {
         mass: region.params.mass ?? SIM_CONFIG.globalMass,
-        stiffness: region.params.stiffness ?? SIM_CONFIG.globalStiffness,
-        damping: region.params.damping ?? SIM_CONFIG.globalDampingRatio
+        springFrequency: region.params.springFrequency ?? SIM_CONFIG.springFrequency,
+        dampingRatio: region.params.dampingRatio ?? SIM_CONFIG.dampingRatio
       }
     });
     this.maskRegions.push(region);

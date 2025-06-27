@@ -26,11 +26,11 @@ export interface SimulationStepContext {
 export class SimulationStepper {
   static step(ctx: SimulationStepContext, dt: number) {
     dt = Math.min(dt, ctx.maxDt);
-    // 1. Force Phase
+    // 1. Force Phase (updated to pass timestep to springs)
     for (const body of ctx.bodies) {
       ctx.gravityForce.apply(body.nodes);
       body.applyMooneyRivlinForces();
-      body.applySpringForces();
+      body.applySpringForces(dt); // Pass timestep for improved stability
       for (const cell of body.cells) {
         ctx.pressureForce.apply(cell);
       }

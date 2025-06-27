@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mooney-Rivlin Switch Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-container { max-width: 400px; margin: 20px 0; }
+        .mui-switch {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .mui-switch input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mooney-Rivlin Switch Test</h1>
+    <div class="test-container">
+        <div id="parameter-panel-mount"></div>
+        <button onclick="testSwitch()">Test Switch Toggle</button>
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { ParameterPanel } from './src/presentation/ParameterPanel.js';
+        import { StateManager } from './src/infrastructure/StateManager.js';
+        import { EventBus } from './src/infrastructure/EventBus.js';
+
+        const container = document.getElementById('parameter-panel-mount');
+        const simState = new StateManager({ smoothingFrames: 5 });
+        const eventBus = new EventBus();
+        
+        // Listen for parameter changes
+        eventBus.on('parameterChange', (change) => {
+            console.log('Parameter changed:', change);
+            document.getElementById('output').innerHTML = 
+                '<pre>' + JSON.stringify(change, null, 2) + '</pre>';
+        });
+
+        const panel = new ParameterPanel(container, simState, eventBus);
+
+        window.testSwitch = function() {
+            const checkbox = document.getElementById('enableMooneyRivlin');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        };
+
+        // Initial test
+        console.log('Mooney-Rivlin switch initialized');
+    </script>
+</body>
+</html>

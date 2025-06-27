@@ -189,11 +189,13 @@ export async function initSimulation(params?: Partial<SimulationState>) {
     const frameTime = time - lastFrameTime;
     if (frameTime >= minFrameTime) {
       if (!isPaused) {
+        // Only update views when simulation is running
         hexGridView.update(body.cells);
         springView.update(body.springs);
         uiController.step(1/60);
-        pluginSystem.render(1/60);
       }
+      // Always render plugins (they may have their own pause handling)
+      pluginSystem.render(1/60);
       // Adaptive FPS logic
       if (frameTime > minFrameTime * 1.5 && adaptiveFps > 20) {
         slowFrameCount++;

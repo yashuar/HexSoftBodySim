@@ -28,6 +28,7 @@ export class HexGridFactory {
     const nodes: PointMass2D[] = [];
     const nodeMap: Map<string, PointMass2D> = new Map();
     const springs: Spring2D[] = [];
+    const springSet: Set<string> = new Set(); // O(1) spring deduplication
     const cells: HexCell[] = [];
     // Build grid using axial coordinates
     for (let r = 0; r < rows; r++) {
@@ -43,6 +44,8 @@ export class HexGridFactory {
           if (!node) {
             node = PointMass2D.fromParams({ x: corner.x, y: corner.y }, defaultParams);
             (node as any).gridIndex = { q, r };
+            // Assign unique node ID for O(1) spring deduplication
+            (node as any)._nodeId = nodes.length;
             nodeMap.set(key, node);
             nodes.push(node);
           }
@@ -50,11 +53,17 @@ export class HexGridFactory {
         }
         const cell = new HexCell(cellNodes, center, defaultParams, { q, r });
         cells.push(cell);
-        // Add springs for each edge (avoid duplicates)
+        // Add springs for each edge using O(1) deduplication
         for (let i = 0; i < 6; i++) {
           const a = cellNodes[i];
           const b = cellNodes[(i + 1) % 6];
-          if (!springs.some(s => (s.a === a && s.b === b) || (s.a === b && s.b === a))) {
+          // Create canonical spring key (smaller node ID first)
+          const aId = (a as any)._nodeId;
+          const bId = (b as any)._nodeId;
+          const springKey = aId < bId ? `${aId}-${bId}` : `${bId}-${aId}`;
+          
+          if (!springSet.has(springKey)) {
+            springSet.add(springKey);
             const restLength = Math.sqrt(
               Math.pow(a.position.x - b.position.x, 2) +
               Math.pow(a.position.y - b.position.y, 2)
@@ -65,7 +74,7 @@ export class HexGridFactory {
       }
     }
     // Log summary after construction
-    console.info('[DEBUG] Total valid hex cells:', cells.length);
+    console.info(`[DEBUG] Total valid hex cells: ${cells.length}, unique springs: ${springs.length}, spring set size: ${springSet.size}`);
     return new HexSoftBody(nodes, springs, cells);
   }
 
@@ -95,6 +104,7 @@ export class HexGridFactory {
     const nodes: PointMass2D[] = [];
     const nodeMap: Map<string, PointMass2D> = new Map();
     const springs: Spring2D[] = [];
+    const springSet: Set<string> = new Set(); // O(1) spring deduplication
     const cells: HexCell[] = [];
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
@@ -107,6 +117,8 @@ export class HexGridFactory {
           if (!node) {
             node = PointMass2D.fromParams({ x: corner.x, y: corner.y }, defaultParams);
             (node as any).gridIndex = { q: col, r: row };
+            // Assign unique node ID for O(1) spring deduplication
+            (node as any)._nodeId = nodes.length;
             nodeMap.set(key, node);
             nodes.push(node);
           }
@@ -118,7 +130,13 @@ export class HexGridFactory {
         for (let i = 0; i < 6; i++) {
           const a = cellNodes[i];
           const b = cellNodes[(i + 1) % 6];
-          if (!springs.some(s => (s.a === a && s.b === b) || (s.a === b && s.b === a))) {
+          // Create canonical spring key (smaller node ID first)
+          const aId = (a as any)._nodeId;
+          const bId = (b as any)._nodeId;
+          const springKey = aId < bId ? `${aId}-${bId}` : `${bId}-${aId}`;
+          
+          if (!springSet.has(springKey)) {
+            springSet.add(springKey);
             const restLength = Math.sqrt(
               Math.pow(a.position.x - b.position.x, 2) +
               Math.pow(a.position.y - b.position.y, 2)
@@ -128,7 +146,7 @@ export class HexGridFactory {
         }
       }
     }
-    console.info('[DEBUG] Total valid hex cells:', cells.length);
+    console.info(`[DEBUG] Total valid hex cells: ${cells.length}, unique springs: ${springs.length}, spring set size: ${springSet.size}`);
     return new HexSoftBody(nodes, springs, cells);
   }
 }
