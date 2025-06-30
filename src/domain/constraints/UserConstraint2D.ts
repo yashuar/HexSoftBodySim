@@ -61,8 +61,8 @@ export class UserConstraint2D {
     if (!this.enabled) return;
     
     // Apply a strong spring-like force to pull node toward target
-    let dx = this.target.x - this.node.position.x;
-    let dy = this.target.y - this.node.position.y;
+    let dx = this.target.x - this.node.getPositionX();
+    let dy = this.target.y - this.node.getPositionY();
     let distance = Math.sqrt(dx * dx + dy * dy);
     
     // Prevent explosions from very large distances
@@ -99,22 +99,18 @@ export class UserConstraint2D {
       dampingFactor = Math.max(dampingFactor, releaseDamping);
       
       // Additional: apply counter-force to actively stop the node
-      const velocityMag = Math.sqrt(this.node.velocity.x * this.node.velocity.x + this.node.velocity.y * this.node.velocity.y);
+      const velocityMag = Math.sqrt(this.node.getVelocityX() * this.node.getVelocityX() + this.node.getVelocityY() * this.node.getVelocityY());
       if (velocityMag > 0.1) { // If moving significantly
         const counterForceStrength = 500 * releaseProgress; // Increase counter-force over time
-        const velDirX = this.node.velocity.x / velocityMag;
-        const velDirY = this.node.velocity.y / velocityMag;
-        this.node.applyForce({ 
-          x: -velDirX * counterForceStrength, 
-          y: -velDirY * counterForceStrength 
-        });
+        const velDirX = this.node.getVelocityX() / velocityMag;
+        const velDirY = this.node.getVelocityY() / velocityMag;
+        this.node.addForce(-velDirX * counterForceStrength, -velDirY * counterForceStrength);
       }
     }
     
-    this.node.velocity.x *= (1 - dampingFactor);
-    this.node.velocity.y *= (1 - dampingFactor);
+    this.node.scaleVelocity(1 - dampingFactor);
     
-    this.node.applyForce({ x: fx, y: fy });
+    this.node.addForce(fx, fy);
     
     if (this.isReleasing) {
       console.log(`[UserConstraint2D] Releasing - strength: ${effectiveStrength.toFixed(1)}, damping: ${dampingFactor.toFixed(3)}`);
@@ -130,15 +126,14 @@ export class UserConstraint2D {
     if (!this.enabled) return;
     
     // Minimal position correction for very close targets only
-    const dx = this.target.x - this.node.position.x;
-    const dy = this.target.y - this.node.position.y;
+    const dx = this.target.x - this.node.getPositionX();
+    const dy = this.target.y - this.node.getPositionY();
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     // Only apply position correction for very precise targeting
     if (distance < 0.05) {
       const correctionFactor = 0.1; // Very light position correction
-      this.node.position.x += dx * correctionFactor;
-      this.node.position.y += dy * correctionFactor;
+      this.node.translatePosition(dx * correctionFactor, dy * correctionFactor);
       
       console.log(`[UserConstraint2D] Fine position correction at distance ${distance.toFixed(3)}`);
     }

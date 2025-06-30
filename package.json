@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "vite build",
-    "start": "vite",
+    "start": "vite --host",
     "preview": "vite preview",
     "demo": "npm run build && npm run preview",
     "test": "vitest run",

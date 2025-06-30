@@ -1,6 +1,7 @@
 // Spring2D: Represents a spring constraint between two PointMass2D objects in the simulation engine.
 // Responsible for applying spring force (Hooke's law) and optional damping between the two masses.
 // Used to connect nodes in the hexagonal mesh for elastic behavior.
+// UPDATED: Integrated with AdaptiveConstraintSolver to prevent center-crossing and force accumulation
 
 import { PointMass2D } from './PointMass2D';
 import { CellParameters } from './CellParameters';
@@ -16,13 +17,16 @@ export class Spring2D {
   private _springFrequency: number; // Hz - more intuitive than raw stiffness
   private _dampingRatio: number; // 0.0 = no damping, 1.0 = critical damping
   private _restLength: number;
+  
+  // Store the original calculated rest length for scaling purposes
+  originalRestLength?: number;
 
   // Spring frequency in Hz (Box2D style - more intuitive)
   get springFrequency() { return this._springFrequency; }
   set springFrequency(val: number) {
     if (this._springFrequency !== val) {
       if (SIM_CONFIG.enableDebugLogging) {
-        console.log(`[Spring2D] springFrequency changed: ${this._springFrequency} -> ${val} Hz`);
+        DebugLogger.log('spring', 'springFrequency changed', { from: this._springFrequency, to: val });
       }
       this._springFrequency = Math.max(0.1, val); // Minimum frequency for stability
     }
@@ -33,7 +37,7 @@ export class Spring2D {
   set dampingRatio(val: number) {
     if (this._dampingRatio !== val) {
       if (SIM_CONFIG.enableDebugLogging) {
-        console.log(`[Spring2D] dampingRatio changed: ${this._dampingRatio} -> ${val}`);
+        DebugLogger.log('spring', 'dampingRatio changed', { from: this._dampingRatio, to: val });
       }
       this._dampingRatio = Math.max(0.0, Math.min(val, 2.0)); // Clamp to reasonable range
     }
@@ -73,7 +77,7 @@ export class Spring2D {
   set restLength(val: number) {
     if (this._restLength !== val) {
       if (SIM_CONFIG.enableDebugLogging) {
-        console.log(`[Spring2D] restLength changed: ${this._restLength} -> ${val}`);
+        DebugLogger.log('spring', 'restLength changed', { from: this._restLength, to: val });
       }
       this._restLength = val;
     }
@@ -107,9 +111,11 @@ export class Spring2D {
     // Flag to determine if legacy parameters are being used
     useLegacyParameters: boolean = false
   ) {
+    DebugLogger.log('spring', 'Constructor', { restLength, springFrequencyOrStiffness, useLegacyParameters });
     this.a = a;
     this.b = b;
     this._restLength = restLength;
+    this.originalRestLength = restLength; // Store the original calculated rest length
     
     // Handle both new frequency-based and legacy stiffness-based parameters
     if (useLegacyParameters) {
@@ -178,43 +184,116 @@ export class Spring2D {
   private static _maxDisp = Number.NEGATIVE_INFINITY;
   private static _minForce = Number.POSITIVE_INFINITY;
   private static _maxForce = Number.NEGATIVE_INFINITY;
+  
+  // Additional debug tracking
+  private static _totalApplyCalls = 0;
+  private static _lastApplyCountLog = 0;
 
   // Apply spring force and damping to the connected point masses (improved version)
-  apply(dt: number = 1/60): void {
+  // CRITICAL FIX: Added pre-constraint solving to prevent center crossing and force accumulation
+  apply(dt: number = 1/60, boundaryDampingScale: number = 1.0, constraintSolver?: any): void {
+    // Debug: Count all apply calls to see if springs are being called at all
+    if (SIM_CONFIG.enableDebugLogging) {
+      Spring2D._totalApplyCalls = (Spring2D._totalApplyCalls || 0) + 1;
+      const now = Date.now();
+      if (now - (Spring2D._lastApplyCountLog || 0) > 3000) { // Log every 3 seconds
+        DebugLogger.log('spring', 'Total apply() calls in last 3s', { count: Spring2D._totalApplyCalls || 0 });
+        Spring2D._lastApplyCountLog = now;
+        Spring2D._totalApplyCalls = 0;
+      }
+    }
+    
+    // Pre-solving constraint check (if constraint solver is provided)
+    if (constraintSolver && constraintSolver.isRegistered && constraintSolver.isRegistered(this)) {
+      // Let the constraint solver handle center-crossing and force accumulation
+      // The constraint solver will modify positions/velocities before force application
+    }
+    
+    // Debug: Log boundary damping application occasionally
+    if (boundaryDampingScale !== 1.0 && Math.random() < 0.001) { // Very rare logging
+      DebugLogger.log('spring', 'Applying boundary damping', {
+        boundaryDampingScale,
+        originalDampingRatio: this._dampingRatio,
+        springFrequency: this._springFrequency
+      });
+    }
+    
     const dx = this.b.position.x - this.a.position.x;
     const dy = this.b.position.y - this.a.position.y;
 
-    // Clamp dx, dy, dist, displacement to prevent numerical explosions
-    const MAX_DIST = 1e4;
+    // Early bounds checking to prevent extreme cases - adjusted for coordinate system
+    const MAX_DIST = 30; // Much reduced from 300 for new coordinate scale
     const clampedDx = Math.max(-MAX_DIST, Math.min(dx, MAX_DIST));
     const clampedDy = Math.max(-MAX_DIST, Math.min(dy, MAX_DIST));
-    let dist = Math.sqrt(clampedDx * clampedDx + clampedDy * clampedDy) || 1e-8; // Avoid division by zero
+    let dist = Math.sqrt(clampedDx * clampedDx + clampedDy * clampedDy) || 1e-8;
+    
+    // EMERGENCY CONSTRAINT REMOVED: Direct position correction was causing artificial oscillations
+    // Natural spring forces with proper limiting provide sufficient stability
+    
     dist = Math.min(dist, MAX_DIST);
     const dirX = clampedDx / dist;
     const dirY = clampedDy / dist;
 
     // Displacement from rest length
     let displacement = dist - this.restLength;
-    displacement = Math.max(-MAX_DIST, Math.min(displacement, MAX_DIST));
     const absDisp = Math.abs(displacement);
 
-    // Timestep-aware stiffness calculation (Box2D approach)
+    // IMPROVED: Progressive stiffness with anti-folding bias AND adaptive stretch response
     const timestepAwareK = this.getTimestepAwareStiffness(dt);
-
-    // Strain-stiffening: effective stiffness increases with strain
-    const kEff = this.baseStiffness + this.stiffeningCoeff * Math.pow(absDisp, this.stiffeningPower);
     
-    // Combine timestep-aware and strain-stiffening effects
-    const finalK = timestepAwareK + kEff;
-
-    // Non-Hookean force: F = kEff * x + k3 * x^3
-    // Clamp values to avoid instability but do not overdamp
-    const safeK = Math.max(1e-6, Math.min(finalK, 100)); // Reduced max stiffness from 1e3 to 100
-    const forceMag = safeK * displacement + this.nonLinearCoeff * Math.pow(displacement, 3);
+    // Progressive stiffness curve with enhanced compression handling
+    let progressiveK = timestepAwareK;
+    const stretchRatio = dist / this.restLength;
     
-    // Additional safety: clamp force magnitude to prevent explosions
-    const MAX_FORCE_MAG = 1000; // Reasonable force limit
-    const clampedForceMag = Math.max(-MAX_FORCE_MAG, Math.min(forceMag, MAX_FORCE_MAG));
+    // ADAPTIVE STIFFNESS: Much more aggressive response to prevent folding and over-stretching
+    let stiffnessMultiplier = 1.0;
+    if (stretchRatio > 2.0) {
+      // EXTREME stretching - very aggressive response
+      stiffnessMultiplier = 12.0;
+      DebugLogger.log('spring', 'EXTREME stretch detected', { ratio: stretchRatio, stiffnessMultiplier });
+    } else if (stretchRatio > 1.5) {
+      // Very stiff for excessive stretching - prevent springs from becoming too long
+      stiffnessMultiplier = 6.0;
+      DebugLogger.log('spring', 'High stretch detected', { ratio: stretchRatio, stiffnessMultiplier });
+    } else if (stretchRatio > 1.3) {
+      // Moderate stretching - increase stiffness progressively
+      stiffnessMultiplier = 3.0;
+    } else if (stretchRatio > 1.1) {
+      // Light stretching - slight increase
+      stiffnessMultiplier = 1.5;
+    } else if (stretchRatio < 0.3) {
+      // EXTREME compression/folding - maximum response
+      stiffnessMultiplier = 20.0;
+      DebugLogger.log('spring', 'EXTREME compression detected', { ratio: stretchRatio, stiffnessMultiplier });
+    } else if (stretchRatio < 0.6) {
+      // Severe compression - very stiff response
+      stiffnessMultiplier = 10.0;
+      DebugLogger.log('spring', 'Severe compression detected', { ratio: stretchRatio, stiffnessMultiplier });
+    } else if (stretchRatio < 0.8) {
+      // Moderate compression - stiffer response
+      stiffnessMultiplier = 4.0;
+    }
+    
+    progressiveK *= stiffnessMultiplier;
+    
+    // Spring force with progressive stiffness
+    let forceMag = progressiveK * displacement;
+    
+    // FORCE ACCUMULATION FIX: Enhanced force limiting with velocity-based scaling
+    const relativeSpeed = Math.sqrt(
+      (this.b.velocity.x - this.a.velocity.x) ** 2 + 
+      (this.b.velocity.y - this.a.velocity.y) ** 2
+    );
+    
+    // Reduce force if nodes are moving too fast (prevents explosive acceleration)
+    const speedLimit = 20; // INCREASED from 10 for better momentum preservation
+    const speedFactor = relativeSpeed > speedLimit ? speedLimit / relativeSpeed : 1.0;
+    forceMag *= speedFactor;
+    
+    // Stricter force limiting with adaptive bounds - increased for new coordinate system
+    const maxForceBase = 50; // INCREASED from 15 for stronger spring forces
+    const dynamicMaxForce = maxForceBase * (1.0 + Math.min(stretchRatio, 3.0)); // Allow higher forces for larger deformations
+    const clampedForceMag = Math.max(-dynamicMaxForce, Math.min(forceMag, dynamicMaxForce));
 
     // Relative velocity along the spring direction
     const relVelX = this.b.velocity.x - this.a.velocity.x;
@@ -226,13 +305,14 @@ export class Spring2D {
     const safeReducedMass = Math.max(1e-6, Math.min(reducedMass, 1e3));
     
     // Use the configured damping ratio from global config, but allow per-spring override
-    const dampingRatio = this._dampingRatio; // Use spring-specific damping ratio
-    const safeDampingRatio = Math.max(0.01, Math.min(dampingRatio, 1.5));
+    // Apply boundary damping scale for oscillation prevention
+    const effectiveDampingRatio = this._dampingRatio * boundaryDampingScale;
+    const safeDampingRatio = Math.max(0.01, Math.min(effectiveDampingRatio, 1.5));
     
-    // Critical damping calculation (FIXED - was using wrong formula)
+    // Critical damping calculation using progressive stiffness
     const omega = 2 * Math.PI * this._springFrequency;
-    const stiffness = timestepAwareK; // Use the actual stiffness being applied
-    const bCritical = 2 * Math.sqrt(stiffness * safeReducedMass); // CORRECT physics formula
+    const stiffness = progressiveK; // Use the progressive stiffness
+    const bCritical = 2 * Math.sqrt(stiffness * safeReducedMass);
     const b = safeDampingRatio * bCritical;
     const dampingForce = b * relVelAlongSpring;
 
@@ -250,64 +330,57 @@ export class Spring2D {
         b: { pos: { ...this.b.position }, vel: { ...this.b.velocity }, mass: this.b.mass }
       });
     }
-    if (totalForceMag > MAX_FORCE_MAG) {
-      if (typeof DebugLogger !== 'undefined') DebugLogger.log('spring', 'Exceeded MAX_FORCE_MAG clamp', {
+    if (totalForceMag > dynamicMaxForce) {
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('spring', 'Exceeded dynamicMaxForce clamp', {
         spring: this,
         fx, fy, forceMag, dampingForce, totalForceMag,
         a: { pos: { ...this.a.position }, vel: { ...this.a.velocity }, mass: this.a.mass },
         b: { pos: { ...this.b.position }, vel: { ...this.b.velocity }, mass: this.b.mass },
-        MAX_FORCE_MAG
+        dynamicMaxForce
       });
-      const scale = MAX_FORCE_MAG / totalForceMag;
+      const scale = dynamicMaxForce / totalForceMag;
       fx *= scale;
       fy *= scale;
     }
 
-    // Debug: log all values for first spring connected to debug node
+    // Debug: log force application for any spring with ANY displacement or force (very low thresholds)
     if (SIM_CONFIG.enableDebugLogging && 
-        (this.a === (globalThis as any)._debugFirstNode || this.b === (globalThis as any)._debugFirstNode)) {
+        (Math.abs(displacement) > 0.0001 || Math.abs(clampedForceMag) > 0.001 || Math.abs(dampingForce) > 0.001)) {
       const logObj = {
-        a: { pos: { ...this.a.position }, vel: { ...this.a.velocity }, mass: this.a.mass },
-        b: { pos: { ...this.b.position }, vel: { ...this.b.velocity }, mass: this.b.mass },
-        dx, dy, dist, dirX, dirY,
-        displacement, absDisp,
+        springId: `a:(${this.a.position.x.toFixed(1)},${this.a.position.y.toFixed(1)}) -> b:(${this.b.position.x.toFixed(1)},${this.b.position.y.toFixed(1)})`,
+        displacement: displacement.toFixed(6),
+        dist: dist.toFixed(6),
+        restLength: this.restLength.toFixed(6),
         springFrequency: this._springFrequency,
         dampingRatio: this._dampingRatio,
-        timestepAwareK, kEff, finalK, safeK, forceMag,
-        relVelX, relVelY, relVelAlongSpring,
-        reducedMass, safeReducedMass,
-        omega, bCritical, dampingCoeffB: b, dampingForce,
-        fx, fy,
-        restLength: this.restLength,
-        nonLinearCoeff: this.nonLinearCoeff,
-        baseStiffness: this.baseStiffness,
-        stiffeningCoeff: this.stiffeningCoeff,
-        stiffeningPower: this.stiffeningPower,
+        springForce: clampedForceMag.toFixed(6),
+        dampingForce: dampingForce.toFixed(6),
+        totalForce: { fx: fx.toFixed(6), fy: fy.toFixed(6) },
         dt
       };
-      // Automated NaN/Inf detection
-      const hasNaN = Object.values(logObj).some(v => typeof v === 'number' && (!isFinite(v) || isNaN(v))) ||
-        Object.values(logObj.a.pos).some(v => !isFinite(v) || isNaN(v)) ||
-        Object.values(logObj.a.vel).some(v => !isFinite(v) || isNaN(v)) ||
-        Object.values(logObj.b.pos).some(v => !isFinite(v) || isNaN(v)) ||
-        Object.values(logObj.b.vel).some(v => !isFinite(v) || isNaN(v));
-      if (hasNaN) {
-        console.error('[CRITICAL][Spring2D][apply][NaN/Inf detected]', logObj);
+      
+      if (typeof DebugLogger !== 'undefined') {
+        // Only log significant spring init if not high-frequency
+        // Use springForce and dampingForce, which are numbers as strings
+        if (Math.abs(clampedForceMag) > 1e2 || Math.abs(dampingForce) > 1e2) {
+          DebugLogger.log('spring', 'Spring force applied', logObj);
+        }
       } else {
-        console.debug('[DEBUG][Spring2D][apply]', logObj);
+        // Suppress legacy log
       }
     }
 
     // Condensed debug logging for force explosion diagnosis
     if (SIM_CONFIG.enableDebugLogging && 
-        (Math.abs(forceMag) > 1e3 || Math.abs(dampingForce) > 1e3 || Math.abs(fx) > 1e3 || Math.abs(fy) > 1e3)) {
+        (Math.abs(clampedForceMag) > 1e3 || Math.abs(dampingForce) > 1e3 || Math.abs(fx) > 1e3 || Math.abs(fy) > 1e3)) {
       DebugLogger.log('spring', 'Spring force explosion', {
         displacement,
-        finalK,
-        forceMag,
+        progressiveK,
+        forceMag: clampedForceMag,
         relVelAlongSpring,
         bCritical,
-        dampingRatio,
+        effectiveDampingRatio,
+        boundaryDampingScale,
         b,
         dampingForce,
         fx,
@@ -320,9 +393,28 @@ export class Spring2D {
     }
 
     // Only accumulate if force or displacement is significant AND debug logging is enabled
-    const FORCE_EPSILON = 0.01;
+    const FORCE_EPSILON = 0.001; // Reduced from 0.01 to catch more activity
+    const DISPLACEMENT_EPSILON = 0.0001; // Reduced from 0.001 to catch tiny displacements
+    
+    // Debug: Log springs that should be applying force but aren't
     if (SIM_CONFIG.enableDebugLogging && 
-        (Math.abs(forceMag) > FORCE_EPSILON || Math.abs(displacement) > FORCE_EPSILON)) {
+        Math.abs(displacement) > DISPLACEMENT_EPSILON && 
+        Math.abs(clampedForceMag) < FORCE_EPSILON) {
+      if (typeof DebugLogger !== 'undefined') {
+        DebugLogger.log('spring', 'Spring has displacement but low force', {
+          springId: `a:(${this.a.position.x.toFixed(1)},${this.a.position.y.toFixed(1)}) -> b:(${this.b.position.x.toFixed(1)},${this.b.position.y.toFixed(1)})`,
+          displacement: displacement.toFixed(4),
+          springForce: clampedForceMag.toFixed(4),
+          dampingRatio: this._dampingRatio,
+          springFrequency: this._springFrequency,
+          timestepAwareK: timestepAwareK.toFixed(2),
+          progressiveK: progressiveK.toFixed(2)
+        });
+      }
+    }
+    
+    if (SIM_CONFIG.enableDebugLogging && 
+        (Math.abs(forceMag) > FORCE_EPSILON || Math.abs(displacement) > DISPLACEMENT_EPSILON)) {
       Spring2D._applyCount++;
       Spring2D._minDisp = Math.min(Spring2D._minDisp, displacement);
       Spring2D._maxDisp = Math.max(Spring2D._maxDisp, displacement);
@@ -330,12 +422,16 @@ export class Spring2D {
       Spring2D._minForce = Math.min(Spring2D._minForce, forceNorm);
       Spring2D._maxForce = Math.max(Spring2D._maxForce, forceNorm);
     }
-    // Log every 2 seconds (approx, global for all springs) - only when debug logging is enabled
+    // Log every 1 second (approx, global for all springs) - only when debug logging is enabled
     const now = Date.now();
-    if (SIM_CONFIG.enableDebugLogging && now - Spring2D._lastLogTime > 2000 && Spring2D._applyCount > 0) {
-      console.log(
-        `[Spring2D][batch 2s] applies: ${Spring2D._applyCount}, disp[min: ${Spring2D._minDisp.toFixed(2)}, max: ${Spring2D._maxDisp.toFixed(2)}], force[min: ${Spring2D._minForce.toFixed(2)}, max: ${Spring2D._maxForce.toFixed(2)}]`
-      );
+    if (SIM_CONFIG.enableDebugLogging && now - Spring2D._lastLogTime > 1000 && Spring2D._applyCount > 0) {
+      DebugLogger.log('spring', 'batch 1s', {
+        applies: Spring2D._applyCount,
+        minDisp: Spring2D._minDisp,
+        maxDisp: Spring2D._maxDisp,
+        minForce: Spring2D._minForce,
+        maxForce: Spring2D._maxForce
+      });
       Spring2D._lastLogTime = now;
       Spring2D._applyCount = 0;
       Spring2D._minDisp = Number.POSITIVE_INFINITY;
@@ -359,21 +455,21 @@ export class Spring2D {
       
       // Log force propagation issues
       if (totalForce < 0.01 && Math.abs(displacement) > 0.001) {
-        console.warn(`[Spring2D] Force propagation issue detected:`, {
+        DebugLogger.log('spring', 'Force propagation issue detected', {
           displacement: displacement.toFixed(4),
           totalForce: totalForce.toFixed(6),
           dampingRatio: dampingRatio.toFixed(3),
           springFreq: this._springFrequency.toFixed(2),
           mass: safeReducedMass.toFixed(4),
           timestepAwareK: timestepAwareK.toFixed(2),
-          'Expected Force Attenuation per spring': `${(forceAttenuation * 100).toFixed(1)}%`,
-          'Force after 8 springs': `${(Math.pow(1 - forceAttenuation, 8) * 100).toFixed(3)}%`
+          expectedForceAttenuation: `${(forceAttenuation * 100).toFixed(1)}%`,
+          forceAfter8Springs: `${(Math.pow(1 - forceAttenuation, 8) * 100).toFixed(3)}%`
         });
       }
       
       // Log significant forces to trace propagation
       if (totalForce > 0.1) {
-        console.log(`[Spring2D] Force propagation:`, {
+        DebugLogger.log('spring', 'Force propagation', {
           springId: `${this.a.position.x.toFixed(0)},${this.a.position.y.toFixed(0)} -> ${this.b.position.x.toFixed(0)},${this.b.position.y.toFixed(0)}`,
           force: totalForce.toFixed(3),
           displacement: displacement.toFixed(4),

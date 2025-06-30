@@ -10,6 +10,7 @@ import { GroundConstraint2D } from './constraints/GroundConstraint2D';
 import { UserConstraint2D } from './constraints/UserConstraint2D';
 import { SimulationStepper } from './SimulationStepper';
 import { SIM_CONFIG } from '../config';
+import { DebugLogger } from '../infrastructure/DebugLogger';
 
 export class PhysicsWorld2D {
   // All soft bodies in the world
@@ -28,10 +29,10 @@ export class PhysicsWorld2D {
   postReleaseDuration: number = 1.0; // Duration in seconds to apply post-release damping
 
   // Simulation parameters
-  gravity: { x: number; y: number } = { x: 0, y: 0 };
-  globalPressure: number = 0;
-  maxDt: number = 0.033; // 30 FPS default
-  iterationBudget: number = 15; // Increased for stronger interaction forces and robust constraint satisfaction
+  gravity: { x: number; y: number } = SIM_CONFIG.gravity;
+  globalPressure: number = SIM_CONFIG.globalPressure;
+  maxDt: number = SIM_CONFIG.maxTimestep || 0.033;
+  iterationBudget: number = 15; // (Optionally: expose in config if needed)
 
   // Modular force generators
   gravityForce: Gravity2D = new Gravity2D();
@@ -41,7 +42,7 @@ export class PhysicsWorld2D {
   groundY: number = 0;
 
   // Enable or disable ground constraint
-  enableGround: boolean = true;
+  enableGround: boolean = SIM_CONFIG.enableGround;
 
   // Add a soft body to the world and register its constraints
   addBody(body: HexSoftBody): void {
@@ -60,7 +61,7 @@ export class PhysicsWorld2D {
   // Register a node as recently released for post-interaction damping
   addRecentlyReleasedNode(node: any): void {
     this.recentlyReleasedNodes.set(node, performance.now());
-    console.log('[PhysicsWorld2D] Registered node for post-release damping');
+    DebugLogger.log('system-event', 'Registered node for post-release damping', { node });
   }
 
   // Apply post-release damping to recently released nodes
@@ -103,15 +104,18 @@ export class PhysicsWorld2D {
       const now = performance.now();
       if (now - this._lastFpsLogTime >= 1000) {
         const fps = this._frameCount / ((now - this._lastFpsLogTime) / 1000);
-        console.log(`[DEBUG][PhysicsWorld2D] FPS: ${fps.toFixed(1)}, dt: ${this._lastDt}`);
+        DebugLogger.log('performance', 'FPS and dt', { fps: fps.toFixed(1), dt: this._lastDt });
         this._lastFpsLogTime = now;
         this._frameCount = 0;
       }
     }
-    
+
+    // Sync globalPressure to PressureForce2D before each step
+    this.pressureForce.pressure = this.globalPressure;
+
     // Apply post-release damping before physics step
     this.applyPostReleaseDamping();
-    
+
     SimulationStepper.step({
       bodies: this.bodies,
       gravityForce: this.gravityForce,

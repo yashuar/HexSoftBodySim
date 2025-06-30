@@ -3,7 +3,7 @@
 import { CellParameters } from './domain/CellParameters';
 
 // Parameter schema for auto-generated UI controls
-export type ParameterType = 'slider' | 'toggle' | 'vector2';
+export type ParameterType = 'slider' | 'toggle' | 'vector2' | 'select';
 
 export interface ParameterMeta {
   type: ParameterType;
@@ -15,6 +15,8 @@ export interface ParameterMeta {
   unit?: string;
   group: string;
   icon?: string;
+  options?: { value: string; label: string }[]; // For select type
+  advanced?: boolean; // If true, only show in Advanced mode
 }
 
 export interface ParameterSchema {
@@ -23,13 +25,31 @@ export interface ParameterSchema {
 
 // Parameter schema definition for UI auto-generation
 export const PARAMETER_SCHEMA: ParameterSchema = {
+  globalPressure: {
+    type: 'slider',
+    label: 'Global Pressure',
+    description: 'Internal pressure applied to each cell (Pa)',
+    min: 0,
+    max: 100,
+    step: 0.1,
+    unit: 'Pa',
+    group: 'Physics',
+    icon: 'compress'
+  },
+  enableGround: {
+    type: 'toggle',
+    label: 'Enable Ground',
+    description: 'Enable or disable ground constraint',
+    group: 'Physics',
+    icon: 'horizontal_rule'
+  },
   // Physics group - Core physics parameters
   springFrequency: {
     type: 'slider',
     label: 'Spring Frequency',
     description: 'Spring oscillation frequency in Hz (higher = stiffer springs)',
     min: 0.1,
-    max: 20,
+    max: 15,
     step: 0.1,
     unit: 'Hz',
     group: 'Physics',
@@ -40,17 +60,18 @@ export const PARAMETER_SCHEMA: ParameterSchema = {
     label: 'Damping Ratio',
     description: 'Controls how quickly motion is damped (0 = none, 1 = critical, 2 = overdamped)',
     min: 0,
-    max: 2,
+    max: 0.5,
     step: 0.001,
     group: 'Physics',
-    icon: 'waves'
+    icon: 'waves',
+    advanced: true
   },
   globalMass: {
     type: 'slider',
     label: 'Mass',
     description: 'Mass of each point in the simulation',
     min: 0.001,
-    max: 50,
+    max: 0.2,
     step: 0.001,
     unit: 'kg',
     group: 'Physics',
@@ -60,19 +81,20 @@ export const PARAMETER_SCHEMA: ParameterSchema = {
     type: 'slider',
     label: 'Rest Length',
     description: 'Natural length of springs between points',
-    min: 0.1,
-    max: 2,
+    min: 0.5,
+    max: 1.5,
     step: 0.01,
     unit: 'm',
     group: 'Physics',
-    icon: 'straighten'
+    icon: 'straighten',
+    advanced: true
   },
   globalInteractionStrength: {
     type: 'slider',
     label: 'Interaction Strength',
     description: 'Strength of inter-cell forces',
     min: 0,
-    max: 10,
+    max: 2,
     step: 0.01,
     group: 'Physics',
     icon: 'link'
@@ -82,9 +104,9 @@ export const PARAMETER_SCHEMA: ParameterSchema = {
     type: 'slider',
     label: 'Force Realism Scale',
     description: 'Scale interaction forces: 0.1=light touch, 1.0=current, 2.0=strong manipulation',
-    min: 0.05,
-    max: 3.0,
-    step: 0.05,
+    min: 0.1,
+    max: 5.0,
+    step: 0.1,
     unit: 'x',
     group: 'Physics',
     icon: 'touch_app'
@@ -182,7 +204,8 @@ export const PARAMETER_SCHEMA: ParameterSchema = {
     step: 0.01,
     unit: '',
     group: 'Physics',
-    icon: 'waves'
+    icon: 'waves',
+    advanced: true
   },
   mooneyMaxForce: {
     type: 'slider',
@@ -195,9 +218,42 @@ export const PARAMETER_SCHEMA: ParameterSchema = {
     group: 'Physics',
     icon: 'security'
   },
+  // Force Coordination System
+  enableForceCoordination: {
+    type: 'toggle',
+    label: 'Force Coordination',
+    description: 'Enable intelligent coordination between force systems',
+    group: 'Physics',
+    icon: 'settings'
+  },
+  materialModelMode: {
+    type: 'select',
+    label: 'Material Model Mode',
+    description: 'Balance between spring and Mooney-Rivlin forces',
+    options: [
+      { value: 'springs-primary', label: 'Springs Primary' },
+      { value: 'hybrid', label: 'Hybrid (Balanced)' },
+      { value: 'mooney-primary', label: 'Mooney-Rivlin Primary' }
+    ],
+    group: 'Physics',
+    icon: 'science'
+  },
+  energyBudgetLimit: {
+    type: 'slider',
+    label: 'Energy Budget Limit',
+    description: 'Maximum system energy before stability intervention',
+    min: 100,
+    max: 5000,
+    step: 100,
+    unit: 'J',
+    group: 'Physics',
+    icon: 'battery_full'
+  },
 };
 
 export const SIM_CONFIG: Readonly<{
+  globalPressure: number;
+  enableGround: boolean;
   defaultParams: CellParameters;
   desiredCellSpacing: number;
   desiredNumCols: number;
@@ -216,33 +272,52 @@ export const SIM_CONFIG: Readonly<{
   enableMooneyRivlin: boolean;
   mooneyDamping: number; // Viscous damping for Mooney-Rivlin material
   mooneyMaxForce: number; // Maximum force per node to prevent instability
+  // Force coordination system
+  enableForceCoordination: boolean;
+  materialModelMode: 'springs-primary' | 'hybrid' | 'mooney-primary';
+  energyBudgetLimit: number;
   maxFps: number;
   enableDebugLogging: boolean;
   // Timestep stability
   maxTimestep: number; // Maximum allowed timestep for stability
   stiffnessTimestepFactor: number; // Factor for timestep-aware stiffness
 }> = {
-  defaultParams: { mass: 1.0, springFrequency: 2.0, dampingRatio: 0.1 }, // Gentle: stable simulation
+  // HUMAN ADIPOSE TISSUE PARAMETERS - Based on scientific research
+  // Research source: Samani et al. - Young's modulus: 3.250 ± 0.910 kPa
+  // Density: 900 kg/m³ (fatty tissue), Poisson's ratio: 0.49
+  // Grid discretization: 20×15 = 300 points for physics simulation (not biological cells)
+  // Total tissue volume represented, divided by grid points for mass per node
+  defaultParams: { 
+    mass: 0.0033, // kg - mass per grid node for ~900 kg/m³ density (assuming 1mm thickness)
+    springFrequency: 8.0, // Hz - increased for stronger spring restoration
+    dampingRatio: 0.05 // Low damping for force propagation (Poisson's ratio affects bulk behavior, not wave damping)
+  }, 
   desiredCellSpacing: 40,
   desiredNumCols: 20,
   desiredNumRows: 15,
   margin: 40,
-  gravity: { x: 0, y: 1 },
-  // Physics parameters - GENTLE settings for stability
-  springFrequency: 2.0, // Moderate frequency = stable springs
-  dampingRatio: 0.1, // Moderate damping for stability
-  globalMass: 1.0, // Normal mass for reasonable forces
-  globalRestLength: 1.0,
-  globalInteractionStrength: 1.0,
-  // NEW: Force realism scaling
-  forceRealismScale: 1.0, // 1.0 = current forces, 0.1 = light touch, 2.0 = strong manipulation
-  // Simulation parameters
-  enableMooneyRivlin: false,
-  mooneyDamping: 0.15, // Moderate damping for biological realism
-  mooneyMaxForce: 50.0, // Reasonable force limit for stability
+  gravity: { x: 0, y: 0 }, // Gravity disabled by default
+  globalPressure: 1.75, // Default pressure for soft tissue
+  enableGround: false, // Ground constraint disabled by default
+  // BIOMECHANICALLY ACCURATE FAT TISSUE PHYSICS
+  springFrequency: 8.0, // Hz - increased for stronger spring restoration
+  dampingRatio: 0.05, // Much lower damping for force propagation (was 0.49 - too high!)
+  globalMass: 0.06, // kg - mass per discretization node (tunable for simulation stability)
+  globalRestLength: 1.0, // Placeholder - actual rest lengths calculated from geometry
+  globalInteractionStrength: 1.0, // REMOVED - no longer needed with direct physics
+  // REMOVED ALL SCALING COMPLEXITY
+  forceRealismScale: 3.0, // Increased for much stronger user interaction
+  // Simulation parameters - adjusted for fat tissue at new scale
+  enableMooneyRivlin: true, // Keep for realistic soft-body physics
+  mooneyDamping: 0.2, // Higher damping for new scale
+  mooneyMaxForce: 8.0, // Much lower force limits for new scale (was 30.0)
+  // Force coordination system (DISABLED for simplified physics)
+  enableForceCoordination: false,
+  materialModelMode: 'springs-primary' as const,
+  energyBudgetLimit: 200, // Lower energy budget for new scale
   maxFps: 60,
-  enableDebugLogging: true, // ENABLE for force propagation debugging
-  // Timestep stability (less conservative for better force propagation)
-  maxTimestep: 1.0 / 30.0, // 30 FPS max for stability
-  stiffnessTimestepFactor: 1.0, // Full stiffness (was 0.8 - unnecessarily conservative)
+  enableDebugLogging: true, // Keep enabled for debugging
+  // Timestep stability - optimized for higher frequencies
+  maxTimestep: 1.0 / 120.0, // Higher frequency simulation (120 FPS) for stability
+  stiffnessTimestepFactor: 1.0, // Full stiffness for proper force transmission
 };

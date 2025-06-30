@@ -6,6 +6,7 @@ import { Spring2D } from '../domain/Spring2D';
 import { HexCell } from '../domain/HexCell';
 import { HexSoftBody } from '../domain/HexSoftBody';
 import { CellParameters } from '../domain/CellParameters';
+import { CoordinateTransform } from './CoordinateTransform';
 
 function axialToPixel(q: number, r: number, size: number) {
   const x = size * Math.sqrt(3) * (q + r / 2);
@@ -198,12 +199,130 @@ export class HexGridFactory {
               Math.pow(a.position.x - b.position.x, 2) +
               Math.pow(a.position.y - b.position.y, 2)
             );
+            console.log(`[HexGridFactory] Creating spring ${springKey}: restLength=${restLength.toFixed(2)}, springFreq=${defaultParams.springFrequency}`);
             springs.push(Spring2D.fromParams(a, b, restLength, defaultParams));
           }
         }
       }
     }
     console.info(`[DEBUG] Total valid hex cells: ${cells.length}, unique springs: ${springs.length}, spring set size: ${springSet.size}`);
+    return new HexSoftBody(nodes, springs, cells);
+  }
+
+  // Create a hex grid using coordinate transformation (physics coordinates)
+  static createHexSoftBodyWithTransform(
+    coordinateTransform: CoordinateTransform, 
+    spacing: number, 
+    defaultParams: CellParameters, 
+    margin: number = 0, 
+    numCols?: number, 
+    numRows?: number
+  ): HexSoftBody {
+    // Get physics world bounds
+    const physicsBounds = coordinateTransform.getPhysicsBounds();
+    
+    // Use a moderate default margin in physics units
+    const physicsMargin = coordinateTransform.screenDistanceToPhysics(Math.max(margin, 40));
+    
+    // Calculate available space in physics coordinates
+    const availableWidth = physicsBounds.width - 2 * physicsMargin;
+    const availableHeight = physicsBounds.height - 2 * physicsMargin;
+    
+    // Convert spacing from screen to physics coordinates
+    const physicsSpacing = coordinateTransform.screenDistanceToPhysics(spacing);
+    
+    // Hexagon geometry in physics coordinates
+    const hexWidth = Math.sqrt(3) * physicsSpacing;
+    const hexHeight = 2 * physicsSpacing;
+    const vertSpacing = 0.75 * hexHeight;
+    
+    // Calculate grid dimensions
+    let maxCols = numCols ?? Math.floor(availableWidth / hexWidth);
+    let maxRows = numRows ?? Math.floor(availableHeight / vertSpacing);
+    
+    // Ensure minimum grid size
+    maxCols = Math.max(maxCols, 3);
+    maxRows = Math.max(maxRows, 3);
+    
+    // Center the grid in physics space
+    const totalGridWidth = maxCols * hexWidth;
+    const totalGridHeight = maxRows * vertSpacing;
+    const offsetX = (physicsBounds.width - totalGridWidth) / 2;
+    const offsetY = (physicsBounds.height - totalGridHeight) / 2;
+    
+    console.log(`[HexGridFactory] Creating physics-coordinate grid:
+      Physics bounds: ${physicsBounds.width.toFixed(2)} x ${physicsBounds.height.toFixed(2)}
+      Grid size: ${maxCols} x ${maxRows} cells
+      Physics spacing: ${physicsSpacing.toFixed(3)}
+      Offset: ${offsetX.toFixed(2)}, ${offsetY.toFixed(2)}`);
+    
+    // Create grid using physics coordinates
+    const nodes: PointMass2D[] = [];
+    const nodeMap: Map<string, PointMass2D> = new Map();
+    const springs: Spring2D[] = [];
+    const springSet: Set<string> = new Set();
+    const cells: HexCell[] = [];
+    
+    // Build grid using axial coordinates in physics space
+    for (let r = 0; r < maxRows; r++) {
+      for (let q = 0; q < maxCols; q++) {
+        // Calculate center in physics coordinates
+        const physicsCenter = {
+          x: offsetX + physicsSpacing * Math.sqrt(3) * (q + r / 2),
+          y: offsetY + physicsSpacing * 1.5 * r
+        };
+        
+        // Compute 6 corners in physics coordinates
+        const corners = Array.from({ length: 6 }, (_, i) => {
+          const angle_deg = 60 * i - 30;
+          const angle_rad = Math.PI / 180 * angle_deg;
+          return {
+            x: physicsCenter.x + physicsSpacing * Math.cos(angle_rad),
+            y: physicsCenter.y + physicsSpacing * Math.sin(angle_rad),
+          };
+        });
+        
+        // Create or reuse nodes at each corner
+        const cellNodes: PointMass2D[] = [];
+        for (const corner of corners) {
+          const key = `${corner.x.toFixed(6)},${corner.y.toFixed(6)}`;
+          let node = nodeMap.get(key);
+          if (!node) {
+            node = PointMass2D.fromParams(corner, defaultParams);
+            (node as any).gridIndex = { q, r };
+            (node as any)._nodeId = nodes.length;
+            nodeMap.set(key, node);
+            nodes.push(node);
+          }
+          cellNodes.push(node);
+        }
+        
+        const cell = new HexCell(cellNodes, physicsCenter, defaultParams, { q, r });
+        cells.push(cell);
+        
+        // Add springs for each edge using O(1) deduplication
+        for (let i = 0; i < 6; i++) {
+          const a = cellNodes[i];
+          const b = cellNodes[(i + 1) % 6];
+          const aId = (a as any)._nodeId;
+          const bId = (b as any)._nodeId;
+          const springKey = aId < bId ? `${aId}-${bId}` : `${bId}-${aId}`;
+          
+          if (!springSet.has(springKey)) {
+            springSet.add(springKey);
+            const restLength = Math.sqrt(
+              Math.pow(a.position.x - b.position.x, 2) +
+              Math.pow(a.position.y - b.position.y, 2)
+            );
+            springs.push(Spring2D.fromParams(a, b, restLength, defaultParams));
+          }
+        }
+      }
+    }
+    
+    console.info(`[HexGridFactory] Physics grid created: ${cells.length} cells, ${springs.length} springs, ${nodes.length} nodes`);
+    console.info(`[HexGridFactory] Sample node position (physics): ${nodes[0]?.position.x.toFixed(3)}, ${nodes[0]?.position.y.toFixed(3)}`);
+    
     return new HexSoftBody(nodes, springs, cells);
   }
 }

@@ -60,13 +60,10 @@ export class HexSoftBody {
     }
   }
 
-  // Apply all spring forces (updated to pass timestep for stability)
-  applySpringForces(dt: number = 1/60): void {
+  // Apply all spring forces (updated to pass timestep for stability and constraint solver)
+  applySpringForces(dt: number = 1/60, boundaryDampingScale: number = 1.0, constraintSolver?: any): void {
     for (const spring of this.springs) {
-      if (spring.dirty) {
-        spring.apply(dt); // Pass timestep for timestep-aware stiffness calculation
-        spring.dirty = false;
-      }
+      spring.apply(dt, boundaryDampingScale, constraintSolver); // Always apply spring forces every step
     }
   }
 

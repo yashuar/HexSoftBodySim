@@ -1,10 +1,13 @@
 import * as PIXI from 'pixi.js';
+import { CoordinateTransform } from '../../application/CoordinateTransform';
 
 export class SpringView extends PIXI.Container {
     private springGraphics: PIXI.Graphics[] = [];
+    private coordinateTransform: CoordinateTransform;
 
-    constructor(springs: any[]) {
+    constructor(springs: any[], coordinateTransform: CoordinateTransform) {
         super();
+        this.coordinateTransform = coordinateTransform;
         this.initSprings(springs);
     }
 
@@ -34,8 +37,11 @@ export class SpringView extends PIXI.Container {
                 const a = spring.a;
                 const b = spring.b;
                 if (a && b) {
-                    mainGraphics.moveTo(a.position.x, a.position.y);
-                    mainGraphics.lineTo(b.position.x, b.position.y);
+                    // COORDINATE SYSTEM FIX: Convert physics positions to screen positions for rendering
+                    const screenPosA = this.coordinateTransform.physicsToScreen(a.position.x, a.position.y);
+                    const screenPosB = this.coordinateTransform.physicsToScreen(b.position.x, b.position.y);
+                    mainGraphics.moveTo(screenPosA.x, screenPosA.y);
+                    mainGraphics.lineTo(screenPosB.x, screenPosB.y);
                 }
             }
             

@@ -16,14 +16,14 @@ export class PressureForce2D {
     for (let i = 0; i < cell.nodes.length; i++) {
       const node = cell.nodes[i];
       // Outward direction from centroid to node
-      const dx = node.position.x - centroid.x;
-      const dy = node.position.y - centroid.y;
+      const dx = node.getPositionX() - centroid.x;
+      const dy = node.getPositionY() - centroid.y;
       const len = Math.sqrt(dx * dx + dy * dy) || 1e-8;
       const dirX = dx / len;
       const dirY = dy / len;
       // Apply pressure force proportional to cell area and pressure
       const forceMag = this.pressure * cell.getArea() / cell.nodes.length;
-      node.applyForce({ x: forceMag * dirX, y: forceMag * dirY });
+      node.addForce(forceMag * dirX, forceMag * dirY);
     }
   }
 }

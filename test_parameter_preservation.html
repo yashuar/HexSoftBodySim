@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parameter Preservation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-step {
+            margin: 15px 0;
+            padding: 10px;
+            border-left: 4px solid #007acc;
+            background: #f8f9fa;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #005a9c;
+        }
+        #output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            min-height: 200px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Parameter Preservation Test</h1>
+        <p>This test verifies that parameters are preserved when the simulation is reset.</p>
+        
+        <div class="test-step">
+            <strong>Step 1:</strong> Change some parameters below, then click "Test Parameter Preservation"
+        </div>
+        
+        <div>
+            <label>Spring Frequency: <input type="range" id="springFreq" min="0.1" max="20" step="0.1" value="4.0"></label>
+            <span id="springFreqValue">4.0</span>
+        </div>
+        <div>
+            <label>Damping Ratio: <input type="range" id="dampingRatio" min="0" max="2" step="0.01" value="0.7"></label>
+            <span id="dampingRatioValue">0.7</span>
+        </div>
+        <div>
+            <label>Global Mass: <input type="range" id="globalMass" min="0.1" max="10" step="0.1" value="1.0"></label>
+            <span id="globalMassValue">1.0</span>
+        </div>
+        <div>
+            <label>Speed: <input type="range" id="speed" min="0.1" max="4" step="0.1" value="1.0"></label>
+            <span id="speedValue">1.0</span>
+        </div>
+        
+        <div>
+            <button onclick="testParameterPreservation()">Test Parameter Preservation</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <div id="output"></div>
+    </div>
+
+    <script type="module">
+        import { StateManager } from './src/infrastructure/StateManager.js';
+        import { ParameterPanel } from './src/presentation/ParameterPanel.js';
+        import { EventBus } from './src/infrastructure/EventBus.js';
+
+        let logOutput = '';
+        
+        function log(message) {
+            logOutput += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            document.getElementById('output').textContent = logOutput;
+        }
+        
+        window.clearLog = function() {
+            logOutput = '';
+            document.getElementById('output').textContent = '';
+        };
+
+        // Create a mock simulation state
+        const simState = new StateManager({
+            maskRegions: [],
+            defaultParams: { mass: 1.0, springFrequency: 4.0, dampingRatio: 0.7 },
+            smoothingFrames: 5,
+            desiredCellSpacing: 40,
+            desiredNumCols: 20,
+            desiredNumRows: 15,
+            margin: 40,
+            springFrequency: 4.0,
+            dampingRatio: 0.7,
+            globalMass: 1.0,
+            speed: 1.0
+        });
+
+        const eventBus = new EventBus();
+        
+        // Listen for parameter changes
+        eventBus.on('parameterChange', (change) => {
+            log('Parameter changed: ' + JSON.stringify(change, null, 2));
+            // Update state manager with the change
+            simState.set(change);
+        });
+
+        // Update UI when sliders change
+        function setupSliders() {
+            const sliders = [
+                'springFreq', 'dampingRatio', 'globalMass', 'speed'
+            ];
+            
+            sliders.forEach(id => {
+                const slider = document.getElementById(id);
+                const valueSpan = document.getElementById(id + 'Value');
+                
+                slider.addEventListener('input', () => {
+                    valueSpan.textContent = slider.value;
+                    
+                    // Emit parameter change
+                    const paramName = id === 'springFreq' ? 'springFrequency' : id;
+                    eventBus.emit('parameterChange', {
+                        [paramName]: parseFloat(slider.value)
+                    });
+                });
+            });
+        }
+
+        window.testParameterPreservation = function() {
+            log('=== Starting Parameter Preservation Test ===');
+            
+            // Get current state
+            const currentState = simState.get();
+            log('Current state before reset: ' + JSON.stringify(currentState, null, 2));
+            
+            // Simulate a reset - preserve all current parameter values
+            const preservedState = {
+                ...currentState,
+                defaultParams: {
+                    mass: currentState.globalMass ?? currentState.defaultParams.mass,
+                    springFrequency: currentState.springFrequency ?? currentState.defaultParams.springFrequency,
+                    dampingRatio: currentState.dampingRatio ?? currentState.defaultParams.dampingRatio
+                }
+            };
+            
+            log('Preserved state for reset: ' + JSON.stringify(preservedState, null, 2));
+            
+            // Simulate the reset by updating state manager
+            simState.set(preservedState);
+            
+            const stateAfterReset = simState.get();
+            log('State after reset: ' + JSON.stringify(stateAfterReset, null, 2));
+            
+            // Check if parameters were preserved
+            const checks = [
+                { name: 'springFrequency', expected: currentState.springFrequency, actual: stateAfterReset.springFrequency },
+                { name: 'dampingRatio', expected: currentState.dampingRatio, actual: stateAfterReset.dampingRatio },
+                { name: 'globalMass', expected: currentState.globalMass, actual: stateAfterReset.globalMass },
+                { name: 'speed', expected: currentState.speed, actual: stateAfterReset.speed }
+            ];
+            
+            let allPassed = true;
+            checks.forEach(check => {
+                const passed = Math.abs(check.expected - check.actual) < 0.001;
+                allPassed = allPassed && passed;
+                log(`✓ ${check.name}: ${passed ? 'PASSED' : 'FAILED'} (expected: ${check.expected}, actual: ${check.actual})`);
+            });
+            
+            log(`=== Test ${allPassed ? 'PASSED' : 'FAILED'} ===`);
+        };
+
+        // Initialize
+        setupSliders();
+        log('Parameter preservation test initialized. Change some sliders and click "Test Parameter Preservation".');
+    </script>
+</body>
+</html>

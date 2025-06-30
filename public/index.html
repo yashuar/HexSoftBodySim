@@ -2,7 +2,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  
   <meta charset="UTF-8">
+  <!-- Load Parameter Drawer CSS -->
+  <link rel="stylesheet" href="/parameter-panel.css">
   <title>PhysicsEngine2D Demo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- Google Fonts for Material look -->
@@ -27,11 +30,7 @@
       min-height: 100vh;
       min-width: 100vw;
     }
-    #main-canvas {
-      /* background: magenta !important; */
-    }
     #main-canvas, #overlay-canvas {
-      /* box-sizing: border-box; */
       position: absolute;
       left: 0; top: 0;
       width: 100vw; height: 100vh;
@@ -42,85 +41,16 @@
       pointer-events: none;
       z-index: 2;
     }
-    #ui-panel {
-      position: absolute;
-      top: 24px; right: 24px;
-      width: 320px;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      padding: 24px 20px 16px 20px;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-    }
-    .mui-btn {
-      background: #1976d2;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 10px 18px;
-      font-size: 1rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.2s;
-      box-shadow: 0 1px 3px rgba(25, 118, 210, 0.08);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .mui-btn:hover {
-      background: #1565c0;
-    }
-    .mui-slider {
-      width: 100%;
-      margin: 8px 0 0 0;
-    }
-    .mui-label {
-      font-size: 0.95rem;
-      color: #555;
-      margin-bottom: 4px;
-      font-weight: 500;
-    }
-    .mui-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 8px;
-    }
-    .mui-divider {
-      border: none;
-      border-top: 1px solid #eee;
-      margin: 12px 0;
-    }
   </style>
 </head>
 <body>
   <canvas id="main-canvas"></canvas>
   <canvas id="overlay-canvas"></canvas>
-  <div id="ui-panel">
-    <div class="mui-row" style="justify-content: space-between;">
-      <span style="font-size:1.2rem;font-weight:500;">PhysicsEngine2D</span>
-      <button class="mui-btn" id="pause-btn"><span class="material-icons">pause</span>Pause</button>
-    </div>
-    <hr class="mui-divider">
-    <div>
-      <div class="mui-label">Simulation Speed</div>
-      <input type="range" min="0.1" max="2" step="0.01" value="1" class="mui-slider" id="speed-slider">
-    </div>
-    <div>
-      <div class="mui-label">Stiffness</div>
-      <input type="range" min="0.1" max="10" step="0.1" value="1" class="mui-slider" id="stiffness-slider">
-    </div>
-    <div>
-      <div class="mui-label">Damping</div>
-      <input type="range" min="0" max="0.2" step="0.001" value="0.01" class="mui-slider" id="damping-slider">
-    </div>
-    <hr class="mui-divider">
-    <button class="mui-btn" id="reset-btn"><span class="material-icons">replay</span>Reset</button>
-    <button class="mui-btn" id="add-mask-btn"><span class="material-icons">add</span>Add Mask Region</button>
-  </div>
+  <!-- Modern Drawer UI -->
+  <!-- Modern Drawer UI: Clean root for ParameterDrawer -->
+  <div id="parameter-panel-mount" class="parameter-drawer open"
+    style="position:fixed;top:0;right:0;width:420px;max-width:90vw;height:100vh;z-index:10010;pointer-events:auto;overflow-y:auto;background:#fffbe9;border-left:2px solid #e0b97d;box-shadow:-4px 0 24px 0 rgba(0,0,0,0.13),0 0 0 1px #e0b97d22;">
+  <!-- Parameter panel mount removed for UI rebuild -->
   <script type="module" src="/src/main.ts"></script>
   <!-- PixiJS demo entry for development/testing -->
   <script type="module" src="/src/pixiDemo.ts"></script>

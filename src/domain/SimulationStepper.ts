@@ -9,9 +9,16 @@ import { Integrator2D } from '../domain/Integrator2D';
 import { VolumeConstraint2D } from '../domain/constraints/VolumeConstraint2D';
 import { GroundConstraint2D } from '../domain/constraints/GroundConstraint2D';
 import { UserConstraint2D } from '../domain/constraints/UserConstraint2D';
+import { AdaptiveConstraintSolver } from '../domain/constraints/AdaptiveConstraintSolver';
+import { SimulationRobustnessManager } from '../domain/constraints/SimulationRobustnessManager';
+import { BoundaryStabilizer } from '../domain/constraints/BoundaryStabilizer';
+import { MeshStabilizer } from '../domain/constraints/MeshStabilizer';
+import { HexagonShapeEnforcer } from '../domain/constraints/HexagonShapeEnforcer';
 
 import { DebugLogger } from '../infrastructure/DebugLogger';
+import { ForceCoordinator2D, DEFAULT_FORCE_COORDINATION } from '../infrastructure/ForceCoordinator2D';
 import { SIM_CONFIG } from '../config';
+import { PointMass2D } from './PointMass2D';
 
 export interface SimulationStepContext {
   bodies: HexSoftBody[];
@@ -24,179 +31,267 @@ export interface SimulationStepContext {
   iterationBudget: number;
   maxDt: number;
   worldGravity: { x: number; y: number };
-  uiController?: { applyInteractionForces: () => { extraVolumeConstraints?: any[] } };
+  uiController?: { 
+    applyInteractionForces: () => { extraVolumeConstraints?: any[] };
+    update?: (dt: number) => void;
+    applyGlobalRestoreDamping?: () => void;
+  };
 }
 
 export class SimulationStepper {
+  private static forceCoordinator: ForceCoordinator2D | null = null;
+  private static constraintSolver: AdaptiveConstraintSolver | null = null;
+  private static robustnessManager: SimulationRobustnessManager | null = null;
+  private static boundaryStabilizer: BoundaryStabilizer | null = null;
+  private static meshStabilizer: MeshStabilizer | null = null;
+  private static shapeEnforcer: HexagonShapeEnforcer | null = null;
+
+  // Initialize force coordinator (called once)
+  private static getForceCoordinator(): ForceCoordinator2D {
+    if (!this.forceCoordinator) {
+      const config = {
+        ...DEFAULT_FORCE_COORDINATION,
+        enableCoordination: SIM_CONFIG.enableForceCoordination,
+        materialModelMode: SIM_CONFIG.materialModelMode,
+        energyBudgetLimit: SIM_CONFIG.energyBudgetLimit
+      };
+      this.forceCoordinator = new ForceCoordinator2D(config);
+    }
+    return this.forceCoordinator;
+  }
+  
+  // Initialize constraint solver (called once) 
+  private static getConstraintSolver(): AdaptiveConstraintSolver {
+    if (!this.constraintSolver) {
+      this.constraintSolver = new AdaptiveConstraintSolver();
+    }
+    return this.constraintSolver;
+  }
+  
+  // Initialize robustness manager (called once)
+  private static getRobustnessManager(): SimulationRobustnessManager {
+    if (!this.robustnessManager) {
+      this.robustnessManager = new SimulationRobustnessManager();
+    }
+    return this.robustnessManager;
+  }
+  
+  // Initialize boundary stabilizer (called once)
+  private static getBoundaryStabilizer(): BoundaryStabilizer {
+    if (!this.boundaryStabilizer) {
+      this.boundaryStabilizer = new BoundaryStabilizer();
+    }
+    return this.boundaryStabilizer;
+  }
+  
+  // Initialize mesh stabilizer (called once)
+  private static getMeshStabilizer(): MeshStabilizer {
+    if (!this.meshStabilizer) {
+      this.meshStabilizer = new MeshStabilizer();
+    }
+    return this.meshStabilizer;
+  }
+
+  // Initialize hexagon shape enforcer (called once)
+  private static getShapeEnforcer(): HexagonShapeEnforcer {
+    if (!this.shapeEnforcer) {
+      this.shapeEnforcer = new HexagonShapeEnforcer();
+    }
+    return this.shapeEnforcer;
+  }
+
+  // Update force coordination configuration at runtime
+  static updateForceCoordinationConfig(config: Partial<{
+    enableCoordination: boolean;
+    materialModelMode: 'springs-primary' | 'mooney-primary' | 'hybrid';
+    energyBudgetLimit: number;
+  }>): void {
+    const forceCoordinator = this.getForceCoordinator();
+    forceCoordinator.updateConfig({
+      enableCoordination: config.enableCoordination,
+      materialModelMode: config.materialModelMode,
+      energyBudgetLimit: config.energyBudgetLimit
+    });
+  }
+
   static step(ctx: SimulationStepContext, dt: number) {
+    const stepStartTime = performance.now();
     dt = Math.min(dt, ctx.maxDt);
     
-    // 1. FORCE PHASE: Apply all force-based effects
+    // ENHANCED LOGGING: Track simulation step details
+    const stepId = Math.random().toString(36).substring(2, 8);
+    const initialNodeStates = ctx.bodies.length > 0 ? {
+      firstNodePos: { x: ctx.bodies[0].nodes[0].getPositionX(), y: ctx.bodies[0].nodes[0].getPositionY() },
+      firstNodeVel: { x: ctx.bodies[0].nodes[0].getVelocityX(), y: ctx.bodies[0].nodes[0].getVelocityY() },
+      totalNodes: ctx.bodies.reduce((sum, body) => sum + body.nodes.length, 0),
+      totalSprings: ctx.bodies.reduce((sum, body) => sum + body.springs.length, 0)
+    } : null;
+    
+    // Log step start with system state
+    if (Math.random() < 0.01) { // 1% sample rate for step logging
+      DebugLogger.log('system-event', 'Simulation step started', {
+        stepId,
+        dt,
+        maxDt: ctx.maxDt,
+        gravity: ctx.worldGravity,
+        initialState: initialNodeStates,
+        constraintCounts: {
+          volume: ctx.volumeConstraints.length,
+          user: ctx.userConstraints.length,
+          ground: ctx.groundConstraints.length
+        }
+      });
+    }
+    
+    // Initialize only the systems we actually use
+    const boundaryStabilizer = this.getBoundaryStabilizer();
+    
+    // SIMPLIFIED SIMULATION STEP - focused on user interaction streamlining
+    
+    // 1. UPDATE USER INTERACTIONS (new simplified system)
+    if (ctx.uiController && typeof ctx.uiController.update === 'function') {
+      ctx.uiController.update(dt);
+      
+      // DEBUG: Track forces after user interaction
+      if (ctx.bodies.length > 0 && ctx.bodies[0].nodes.length > 0) {
+        this.trackNodeForces(ctx.bodies[0].nodes[0], "AFTER_USER_INTERACTION", stepId);
+      }
+    }
+    
+    // 2. FORCE PHASE: Apply core forces only
     for (const body of ctx.bodies) {
-      // Note: Forces are reset during integration, not here
-      // Apply forces in logical order:
+      // Apply core physics forces:
       ctx.gravityForce.apply(body.nodes, ctx.worldGravity);
-      body.applyMooneyRivlinForces();
-      body.applySpringForces(dt); // Spring forces (not constraints)
-      // Apply pressure forces to cells
+      
+      // DEBUG: Track forces after gravity
+      if (body.nodes.length > 0) {
+        this.trackNodeForces(body.nodes[0], "AFTER_GRAVITY", stepId);
+      }
+      
+      // Apply Mooney-Rivlin forces if enabled (essential biomechanical feature)
+      if (SIM_CONFIG.enableMooneyRivlin) {
+        body.applyMooneyRivlinForces();
+        
+        // DEBUG: Track forces after Mooney-Rivlin
+        if (body.nodes.length > 0) {
+          this.trackNodeForces(body.nodes[0], "AFTER_MOONEY_RIVLIN", stepId);
+        }
+      }
+      
+      // Apply spring forces (includes all essential features: non-linear, strain-stiffening)
+      body.applySpringForces(dt, 1.0);
+      
+      // DEBUG: Track forces after springs
+      if (body.nodes.length > 0) {
+        this.trackNodeForces(body.nodes[0], "AFTER_SPRINGS", stepId);
+      }
+      
+      // Apply pressure forces to cells (essential for volume preservation)
       for (const cell of body.cells) {
         ctx.pressureForce.apply(cell);
       }
-    }
-    // --- NEW: Apply distributed user interaction forces if present ---
-    let extraVolumeConstraints: any[] = [];
-    if (ctx.uiController && typeof ctx.uiController.applyInteractionForces === 'function') {
-      const result = ctx.uiController.applyInteractionForces();
-      if (result && Array.isArray(result.extraVolumeConstraints)) {
-        extraVolumeConstraints = result.extraVolumeConstraints;
+      
+      // DEBUG: Track forces after pressure
+      if (body.nodes.length > 0) {
+        this.trackNodeForces(body.nodes[0], "AFTER_PRESSURE", stepId);
       }
     }
     
-    // Apply user interaction forces (before integration for immediate response)
-    // Filter out disabled constraints to prevent orphaned constraint processing
-    const activeUserConstraints = ctx.userConstraints?.filter(uc => uc.enabled) ?? [];
-    if (activeUserConstraints.length > 0) {
-      for (const uConstraint of activeUserConstraints) {
-        // Update constraint release timer
-        if (uConstraint.isReleasing) {
-          const releaseComplete = uConstraint.updateRelease(dt);
-          if (releaseComplete) {
-            uConstraint.enabled = false;
-            continue; // Skip applying force if just disabled
-          }
-        }
-        
-        uConstraint.applyForce(); // Use force-based approach for user interaction
-      }
+    // 3. GLOBAL RESTORE DAMPING (helps return to rest state when no interaction)
+    if (ctx.uiController && typeof ctx.uiController.applyGlobalRestoreDamping === 'function') {
+      ctx.uiController.applyGlobalRestoreDamping();
     }
     
-    // 2. INTEGRATION: Update velocities and positions using forces
+    // 4. INTEGRATION: Update velocities and positions using forces
     for (const body of ctx.bodies) {
       Integrator2D.semiImplicitEuler(body.nodes, dt);
     }
     
-    // Explosion detection and recovery
+    // 5. EXPLOSION DETECTION AND RECOVERY (simplified)
     for (const body of ctx.bodies) {
-      // --- Dynamic anomaly thresholds ---
       const canvasWidth = (window && window.innerWidth) ? window.innerWidth : 1920;
       const canvasHeight = (window && window.innerHeight) ? window.innerHeight : 1080;
-      const posMaxVal = 1.2 * Math.max(canvasWidth, canvasHeight); // Allow 20% margin
-      const velMaxVal = 200; // Large velocities are always suspicious
+      const posMaxVal = 1.2 * Math.max(canvasWidth, canvasHeight);
+      const velMaxVal = 200;
 
       for (const node of body.nodes) {
         const pos = node.position;
         const vel = node.velocity;
-        // Gather more context for logging
-        const nodeId = (node as any)._nodeId ?? body.nodes.indexOf(node);
-        // Gather grid/canvas/global info if available
-        const gridInfo = {
-          canvasWidth,
-          canvasHeight,
-          margin: (typeof SIM_CONFIG !== 'undefined' && SIM_CONFIG.margin !== undefined) ? SIM_CONFIG.margin : undefined,
-          spacing: (typeof SIM_CONFIG !== 'undefined' && SIM_CONFIG.desiredCellSpacing !== undefined) ? SIM_CONFIG.desiredCellSpacing : undefined,
-          desiredNumCols: (typeof SIM_CONFIG !== 'undefined' && SIM_CONFIG.desiredNumCols !== undefined) ? SIM_CONFIG.desiredNumCols : undefined,
-          desiredNumRows: (typeof SIM_CONFIG !== 'undefined' && SIM_CONFIG.desiredNumRows !== undefined) ? SIM_CONFIG.desiredNumRows : undefined,
-          actualNumNodes: body.nodes.length,
-          actualNumSprings: body.springs.length,
-          actualNumCells: body.cells.length,
-          posMaxVal,
-          velMaxVal
-        };
-        const nodeInfo = {
-          nodeId,
-          pos: { ...pos },
-          vel: { ...vel },
-          mass: node.mass,
-          damping: node.damping,
-          springs: body.springs.filter(s => s.a === node || s.b === node).map(s => ({
-            other: s.a === node ? (s.b as any)._nodeId ?? body.nodes.indexOf(s.b) : (s.a as any)._nodeId ?? body.nodes.indexOf(s.a),
-            restLength: s.restLength,
-            springFrequency: s.springFrequency,
-            dampingRatio: s.dampingRatio
-          })),
-          gridInfo
-        };
+        
         // Check for NaN/Inf
         if (!isFinite(pos.x) || !isFinite(pos.y) || !isFinite(vel.x) || !isFinite(vel.y)) {
-          DebugLogger.log('pointmass', 'NaN/Inf detected in node', nodeInfo);
-          // Reset to safe values
+          console.warn('[SimulationStepper] NaN/Inf detected, resetting node');
           pos.x = isFinite(pos.x) ? pos.x : 0;
           pos.y = isFinite(pos.y) ? pos.y : 0;
           vel.x = 0;
           vel.y = 0;
         }
-        // Check for excessive values (explosion)
+        
+        // Check for explosive values
         if (Math.abs(pos.x) > posMaxVal || Math.abs(pos.y) > posMaxVal) {
-          DebugLogger.log('pointmass', 'Large position detected in node', nodeInfo);
-          // Clamp to safe range
+          console.warn('[SimulationStepper] Large position detected, clamping');
           pos.x = Math.max(-posMaxVal, Math.min(pos.x, posMaxVal));
           pos.y = Math.max(-posMaxVal, Math.min(pos.y, posMaxVal));
         }
+        
         if (Math.abs(vel.x) > velMaxVal || Math.abs(vel.y) > velMaxVal) {
-          DebugLogger.log('pointmass', 'Large velocity detected in node', nodeInfo);
+          console.warn('[SimulationStepper] Large velocity detected, clamping');
           vel.x = Math.max(-velMaxVal, Math.min(vel.x, velMaxVal));
           vel.y = Math.max(-velMaxVal, Math.min(vel.y, velMaxVal));
         }
       }
-
-      // --- Collapse detection: are most nodes clustered in a tiny region? ---
-      if (body.nodes.length > 2) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const node of body.nodes) {
-          minX = Math.min(minX, node.position.x);
-          maxX = Math.max(maxX, node.position.x);
-          minY = Math.min(minY, node.position.y);
-          maxY = Math.max(maxY, node.position.y);
-        }
-        const spreadX = maxX - minX;
-        const spreadY = maxY - minY;
-        // If all nodes are within a tiny region (e.g. < 2% of canvas), flag as collapse
-        const collapseThreshold = 0.02 * Math.max(canvasWidth, canvasHeight);
-        if (spreadX < collapseThreshold && spreadY < collapseThreshold) {
-          DebugLogger.log('pointmass', 'Grid collapse detected: all nodes clustered', {
-            minX, maxX, minY, maxY, spreadX, spreadY, nodeCount: body.nodes.length, canvasWidth, canvasHeight, collapseThreshold
-          });
-        }
-      }
     }
     
-    // 3. POSITION-BASED CONSTRAINT PHASE: Iteratively correct positions
-    // Merge and deduplicate all area constraints (global + extra)
-    const allAreaConstraints = [...ctx.volumeConstraints];
-    for (const c of extraVolumeConstraints) {
-      if (!allAreaConstraints.includes(c)) {
-        allAreaConstraints.push(c);
-      }
-    }
+    // 6. CONSTRAINT PHASE: Apply position-based constraints
     for (let iter = 0; iter < ctx.iterationBudget; iter++) {
-      for (const vConstraint of allAreaConstraints) {
+      // Apply volume constraints for shape preservation
+      for (const vConstraint of ctx.volumeConstraints) {
         vConstraint.apply();
       }
-      // Fine-tuning user constraints (minimal position corrections only)
-      if (ctx.userConstraints && ctx.userConstraints.length > 0) {
-        for (const uConstraint of ctx.userConstraints) {
-          uConstraint.apply(); // Fine position correction
-        }
-      }
     }
     
-    // 4. ENVIRONMENT CONSTRAINTS: Apply after all other constraints
+    // 7. ENVIRONMENT CONSTRAINTS: Ground, etc.
     if (ctx.enableGround) {
       for (const gConstraint of ctx.groundConstraints) {
         gConstraint.apply();
       }
     }
+  }
+
+  // Enhanced force tracking for debugging
+  static trackNodeForces(node: PointMass2D, phase: string, stepId: string): void {
+    if (!SIM_CONFIG.enableDebugLogging) return;
+    if (Math.random() > 0.8) return; // 20% sample rate for better debugging
     
-    // Log user constraints if present, but only once per second
-    if (ctx.userConstraints && ctx.userConstraints.length > 0) {
-      const now = performance.now();
-      if (!SimulationStepper._lastUserConstraintLogTime || now - SimulationStepper._lastUserConstraintLogTime > 1000) {
-        console.log(`[SimulationStepper] Applied ${ctx.userConstraints.length} user constraint(s) for ${ctx.iterationBudget} iterations`);
-        SimulationStepper._lastUserConstraintLogTime = now;
-      }
-    }
+    const nodeId = (node as any)._nodeId || (node as any)._id || 'unknown';
+    const currentForce = {
+      x: (node as any)._force?.x || 0,
+      y: (node as any)._force?.y || 0
+    };
+    const forceMagnitude = Math.sqrt(currentForce.x * currentForce.x + currentForce.y * currentForce.y);
+    
+    DebugLogger.log('system-event', `Force state: ${phase}`, {
+      stepId,
+      phase,
+      nodeId,
+      nodePosition: { x: node.getPositionX(), y: node.getPositionY() },
+      nodeVelocity: { x: node.getVelocityX(), y: node.getVelocityY() },
+      accumulatedForce: currentForce,
+      forceMagnitude: forceMagnitude,
+      timestamp: Date.now()
+    });
   }
 
   // Track last log time for user constraint logging
   private static _lastUserConstraintLogTime: number = 0;
+
+  // Public method to access mesh stabilizer for debugging
+  static getPublicMeshStabilizer(): MeshStabilizer {
+    return this.getMeshStabilizer();
+  }
+
+  // Public method to access shape enforcer for debugging
+  static getPublicShapeEnforcer(): HexagonShapeEnforcer {
+    return this.getShapeEnforcer();
+  }
 }

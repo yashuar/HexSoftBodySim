@@ -9,20 +9,98 @@ import type { HexCell } from './HexCell';
 
 export class PointMass2D {
   cellRefs?: HexCell[];
-  // Current position in world space
-  position: { x: number; y: number };
-
-  // Current velocity
-  velocity: { x: number; y: number };
-
-  // Accumulated force to be applied during the next integration step
-  force: { x: number; y: number };
+  
+  // PRIVATE internal state - should only be accessed via methods
+  private _position: { x: number; y: number };
+  private _velocity: { x: number; y: number };
+  private _force: { x: number; y: number };
 
   // Mass of the point (must be > 0)
   mass: number;
 
   // Damping factor (0 = no damping, 1 = full damping)
   damping: number;
+
+  // PUBLIC ACCESSORS - Controlled access to internal state
+  get position(): { x: number; y: number } {
+    return { x: this._position.x, y: this._position.y }; // Return copy to prevent mutation
+  }
+
+  get velocity(): { x: number; y: number } {
+    return { x: this._velocity.x, y: this._velocity.y }; // Return copy to prevent mutation
+  }
+
+  get force(): { x: number; y: number } {
+    return { x: this._force.x, y: this._force.y }; // Return copy to prevent mutation
+  }
+
+  // DEPRECATED PROPERTY ACCESSORS - For backward compatibility only
+  // These will show warnings to encourage migration to proper methods
+  set position(value: { x: number; y: number }) {
+    console.warn('[DEPRECATED] Direct position assignment. Use setPosition(x, y) instead.');
+    this._position.x = value.x;
+    this._position.y = value.y;
+  }
+
+  set velocity(value: { x: number; y: number }) {
+    console.warn('[DEPRECATED] Direct velocity assignment. Use setVelocity(vx, vy) instead.');
+    this._velocity.x = value.x;
+    this._velocity.y = value.y;
+  }
+
+  set force(value: { x: number; y: number }) {
+    console.warn('[DEPRECATED] Direct force assignment. Use setForce(fx, fy) or addForce(fx, fy) instead.');
+    this._force.x = value.x;
+    this._force.y = value.y;
+  }
+
+  // POSITION METHODS
+  getPositionX(): number { return this._position.x; }
+  getPositionY(): number { return this._position.y; }
+  
+  setPosition(x: number, y: number): void {
+    this._position.x = x;
+    this._position.y = y;
+  }
+  
+  setPositionX(x: number): void { this._position.x = x; }
+  setPositionY(y: number): void { this._position.y = y; }
+  
+  translatePosition(dx: number, dy: number): void {
+    this._position.x += dx;
+    this._position.y += dy;
+  }
+
+  // VELOCITY METHODS
+  getVelocityX(): number { return this._velocity.x; }
+  getVelocityY(): number { return this._velocity.y; }
+  
+  setVelocity(vx: number, vy: number): void {
+    this._velocity.x = vx;
+    this._velocity.y = vy;
+  }
+  
+  setVelocityX(vx: number): void { this._velocity.x = vx; }
+  setVelocityY(vy: number): void { this._velocity.y = vy; }
+
+  scaleVelocity(factor: number): void {
+    this._velocity.x *= factor;
+    this._velocity.y *= factor;
+  }
+
+  // FORCE METHODS
+  getForceX(): number { return this._force.x; }
+  getForceY(): number { return this._force.y; }
+  
+  addForce(fx: number, fy: number): void {
+    this._force.x += fx;
+    this._force.y += fy;
+  }
+  
+  setForce(fx: number, fy: number): void {
+    this._force.x = fx;
+    this._force.y = fy;
+  }
 
   // Static batching for logging
   private static _lastLogTime = 0;
@@ -52,17 +130,17 @@ export class PointMass2D {
     mass: number = 1.0,
     damping: number = 0.0 // Set to 0 for soft-body systems - damping handled by springs
   ) {
-    this.position = { ...position };
-    this.velocity = { x: 0, y: 0 };
-    this.force = { x: 0, y: 0 };
+    this._position = { ...position };
+    this._velocity = { x: 0, y: 0 };
+    this._force = { x: 0, y: 0 };
     this.mass = mass;
     this.damping = damping;
   }
 
   // Apply a force to this point mass (accumulates until next integration)
   applyForce(force: { x: number; y: number }): void {
-    this.force.x += force.x;
-    this.force.y += force.y;
+    this._force.x += force.x;
+    this._force.y += force.y;
   }
 
   // Integrate position and velocity using semi-implicit Euler
@@ -70,15 +148,15 @@ export class PointMass2D {
     if (this.mass <= 0) return;
     const EPSILON = 0.01;
     // Store old position and velocity for comparison
-    const oldX = this.position.x;
-    const oldY = this.position.y;
-    const oldVx = this.velocity.x;
-    const oldVy = this.velocity.y;
+    const oldX = this._position.x;
+    const oldY = this._position.y;
+    const oldVx = this._velocity.x;
+    const oldVy = this._velocity.y;
     let anomaly = false;
     
     // Store forces for this integration step (before clearing)
-    const fx = this.force.x;
-    const fy = this.force.y;
+    const fx = this._force.x;
+    const fy = this._force.y;
     
     // Reset force accumulator BEFORE integration to avoid double-application
     this.resetForce();
@@ -114,17 +192,34 @@ export class PointMass2D {
     const clampedAx = Math.max(-MAX_ACC, Math.min(ax, MAX_ACC));
     const clampedAy = Math.max(-MAX_ACC, Math.min(ay, MAX_ACC));
     // Update velocity
-    this.velocity.x += clampedAx * dt;
-    this.velocity.y += clampedAy * dt;
-    // Log if velocity changes by a large amount in one step
-    if (Math.abs(this.velocity.x - oldVx) > 50 || Math.abs(this.velocity.y - oldVy) > 50) {
+    this._velocity.x += clampedAx * dt;
+    this._velocity.y += clampedAy * dt;
+    
+    // COORDINATE SYSTEM VELOCITY LIMITING: For a 20-unit wide physics world, 
+    // Allow higher velocities to enable force propagation through the mesh
+    const MAX_VELOCITY = 5.0; // 5 physics units per second (25% of world width)
+    const velMagnitude = Math.sqrt(this._velocity.x * this._velocity.x + this._velocity.y * this._velocity.y);
+    if (velMagnitude > MAX_VELOCITY) {
+      const scale = MAX_VELOCITY / velMagnitude;
+      this._velocity.x *= scale;
+      this._velocity.y *= scale;
+      if (typeof DebugLogger !== 'undefined') {
+        DebugLogger.log('pointmass', 'Velocity clamped to prevent instability', {
+          originalMagnitude: velMagnitude,
+          clampedMagnitude: MAX_VELOCITY,
+          scaleFactor: scale
+        });
+      }
+    }
+    // Log if velocity changes by a large amount in one step (adjusted for coordinate system)
+    if (Math.abs(this._velocity.x - oldVx) > 2.0 || Math.abs(this._velocity.y - oldVy) > 2.0) {
       anomaly = true;
       if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Large velocity change in one step', {
         node: this,
         oldVx,
         oldVy,
-        newVx: this.velocity.x,
-        newVy: this.velocity.y,
+        newVx: this._velocity.x,
+        newVy: this._velocity.y,
         ax,
         ay,
         dt
@@ -134,40 +229,43 @@ export class PointMass2D {
     // In soft-body physics, damping is handled by springs to avoid double-damping
     // which kills force propagation through the mesh
     if (this.damping > 0) {
-      this.velocity.x *= 1 - this.damping;
-      this.velocity.y *= 1 - this.damping;
+      this._velocity.x *= 1 - this.damping;
+      this._velocity.y *= 1 - this.damping;
     }
     // Update position
-    this.position.x += this.velocity.x * dt;
-    this.position.y += this.velocity.y * dt;
-    // Log if position changes by a large amount in one step
-    if (Math.abs(this.position.x - oldX) > 50 || Math.abs(this.position.y - oldY) > 50) {
+    this._position.x += this._velocity.x * dt;
+    this._position.y += this._velocity.y * dt;
+    // Log if position changes by a large amount in one step (adjusted for coordinate system)
+    if (Math.abs(this._position.x - oldX) > 1.0 || Math.abs(this._position.y - oldY) > 1.0) {
       anomaly = true;
       if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Large position change in one step', {
         node: this,
         oldX,
         oldY,
-        newX: this.position.x,
-        newY: this.position.y,
-        velocity: { ...this.velocity },
+        newX: this._position.x,
+        newY: this._position.y,
+        velocity: { ...this._velocity },
         dt
       });
     }
-    // Clamp position and velocity to prevent numerical explosions
-    const MAX_VAL = 1e4;
-    if (Math.abs(this.position.x) > MAX_VAL || Math.abs(this.position.y) > MAX_VAL || Math.abs(this.velocity.x) > MAX_VAL || Math.abs(this.velocity.y) > MAX_VAL) {
+    // Clamp position and velocity to prevent numerical explosions (adjusted for coordinate system)
+    const MAX_POS = 100; // 100 physics units (5x world width)
+    const MAX_VEL = 10;   // 10 physics units/second
+    if (Math.abs(this._position.x) > MAX_POS || Math.abs(this._position.y) > MAX_POS || 
+        Math.abs(this._velocity.x) > MAX_VEL || Math.abs(this._velocity.y) > MAX_VEL) {
       anomaly = true;
-      if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Exceeded MAX_VAL clamp', {
+      if (typeof DebugLogger !== 'undefined') DebugLogger.log('pointmass', 'Exceeded coordinate system limits', {
         node: this,
-        position: { ...this.position },
-        velocity: { ...this.velocity },
-        MAX_VAL
+        position: { ...this._position },
+        velocity: { ...this._velocity },
+        MAX_POS,
+        MAX_VEL
       });
     }
-    this.position.x = Math.max(-MAX_VAL, Math.min(this.position.x, MAX_VAL));
-    this.position.y = Math.max(-MAX_VAL, Math.min(this.position.y, MAX_VAL));
-    this.velocity.x = Math.max(-MAX_VAL, Math.min(this.velocity.x, MAX_VAL));
-    this.velocity.y = Math.max(-MAX_VAL, Math.min(this.velocity.y, MAX_VAL));
+    this._position.x = Math.max(-MAX_POS, Math.min(this._position.x, MAX_POS));
+    this._position.y = Math.max(-MAX_POS, Math.min(this._position.y, MAX_POS));
+    this._velocity.x = Math.max(-MAX_VEL, Math.min(this._velocity.x, MAX_VEL));
+    this._velocity.y = Math.max(-MAX_VEL, Math.min(this._velocity.y, MAX_VEL));
     if (anomaly && typeof DebugLogger !== 'undefined') DebugLogger.flush();
     // Debug: log all values after integration for first node
     if (SIM_CONFIG.enableDebugLogging && this === (globalThis as any)._debugFirstNode) {
@@ -187,10 +285,10 @@ export class PointMass2D {
     }
     // Condensed debug logging for instability
     if (SIM_CONFIG.enableDebugLogging && (
-      !isFinite(this.position.x) ||
-      !isFinite(this.position.y) ||
-      !isFinite(this.velocity.x) ||
-      !isFinite(this.velocity.y)
+      !isFinite(this._position.x) ||
+      !isFinite(this._position.y) ||
+      !isFinite(this._velocity.x) ||
+      !isFinite(this._velocity.y)
     )) {
       DebugLogger.log('pointmass', 'NaN/Inf in PointMass2D', {
         position: this.position,
@@ -203,10 +301,10 @@ export class PointMass2D {
       });
     }
     if (SIM_CONFIG.enableDebugLogging && (
-      Math.abs(this.position.x) > 1e6 ||
-      Math.abs(this.position.y) > 1e6 ||
-      Math.abs(this.velocity.x) > 1e6 ||
-      Math.abs(this.velocity.y) > 1e6
+      Math.abs(this._position.x) > 1e6 ||
+      Math.abs(this._position.y) > 1e6 ||
+      Math.abs(this._velocity.x) > 1e6 ||
+      Math.abs(this._velocity.y) > 1e6
     )) {
       DebugLogger.log('pointmass', 'PointMass2D explosion', {
         position: this.position,
@@ -220,23 +318,23 @@ export class PointMass2D {
     }
     // Only accumulate if position or velocity changed significantly AND debug logging is enabled
     const posChanged =
-      Math.abs(oldX - this.position.x) > EPSILON ||
-      Math.abs(oldY - this.position.y) > EPSILON;
+      Math.abs(oldX - this._position.x) > EPSILON ||
+      Math.abs(oldY - this._position.y) > EPSILON;
     const velChanged =
-      Math.abs(oldVx - this.velocity.x) > EPSILON ||
-      Math.abs(oldVy - this.velocity.y) > EPSILON;
+      Math.abs(oldVx - this._velocity.x) > EPSILON ||
+      Math.abs(oldVy - this._velocity.y) > EPSILON;
     if (SIM_CONFIG.enableDebugLogging && (posChanged || velChanged)) {
       PointMass2D._changeCount++;
       // Track min/max position
-      PointMass2D._minPos.x = Math.min(PointMass2D._minPos.x, this.position.x);
-      PointMass2D._minPos.y = Math.min(PointMass2D._minPos.y, this.position.y);
-      PointMass2D._maxPos.x = Math.max(PointMass2D._maxPos.x, this.position.x);
-      PointMass2D._maxPos.y = Math.max(PointMass2D._maxPos.y, this.position.y);
+      PointMass2D._minPos.x = Math.min(PointMass2D._minPos.x, this._position.x);
+      PointMass2D._minPos.y = Math.min(PointMass2D._minPos.y, this._position.y);
+      PointMass2D._maxPos.x = Math.max(PointMass2D._maxPos.x, this._position.x);
+      PointMass2D._maxPos.y = Math.max(PointMass2D._maxPos.y, this._position.y);
       // Track min/max velocity
-      PointMass2D._minVel.x = Math.min(PointMass2D._minVel.x, this.velocity.x);
-      PointMass2D._minVel.y = Math.min(PointMass2D._minVel.y, this.velocity.y);
-      PointMass2D._maxVel.x = Math.max(PointMass2D._maxVel.x, this.velocity.x);
-      PointMass2D._maxVel.y = Math.max(PointMass2D._maxVel.y, this.velocity.y);
+      PointMass2D._minVel.x = Math.min(PointMass2D._minVel.x, this._velocity.x);
+      PointMass2D._minVel.y = Math.min(PointMass2D._minVel.y, this._velocity.y);
+      PointMass2D._maxVel.x = Math.max(PointMass2D._maxVel.x, this._velocity.x);
+      PointMass2D._maxVel.y = Math.max(PointMass2D._maxVel.y, this._velocity.y);
     }
     // Log every 10 seconds (approx) - only when debug logging is enabled
     const now = Date.now();
@@ -286,19 +384,16 @@ export class PointMass2D {
 
   // Reset the force accumulator
   resetForce(): void {
-    this.force.x = 0;
-    this.force.y = 0;
+    this._force.x = 0;
+    this._force.y = 0;
   }
 
   static getFromPool(position: { x: number; y: number }, mass: number = 1.0, damping: number = 0.0): PointMass2D {
     const obj = this._pool.pop();
     if (obj) {
-      obj.position.x = position.x;
-      obj.position.y = position.y;
-      obj.velocity.x = 0;
-      obj.velocity.y = 0;
-      obj.force.x = 0;
-      obj.force.y = 0;
+      obj.setPosition(position.x, position.y);
+      obj.setVelocity(0, 0);
+      obj.setForce(0, 0);
       obj.mass = mass;
       obj.damping = damping;
       obj.dirty = true;

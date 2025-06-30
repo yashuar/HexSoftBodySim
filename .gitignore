@@ -15,8 +15,29 @@ build/
 .DS_Store
 Thumbs.db
 
+
 # Logs
 *.log
+debug/
+public/debug/
+
+# Vite/Parcel cache
+.vite/
+.parcel-cache/
+
+# Temp/cache
+.cache/
+tmp/
+temp/
+
+# Windows OS
+ehthumbs.db
+Desktop.ini
+
+# Misc
+*.local
+*.bak
+*.tmp
 
 # Environment
 .env

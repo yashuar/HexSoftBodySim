@@ -20,17 +20,38 @@ import { EventBus } from './infrastructure/EventBus';
 import { SIM_CONFIG } from './config';
 import { registerGlobalDebugListeners } from './debugListeners';
 import { DebugLogger } from './infrastructure/DebugLogger';
+import { SimulationStepper } from './domain/SimulationStepper';
+import { CoordinateTransform } from './application/CoordinateTransform';
+import { ParameterDrawer } from './presentation/ParameterDrawer';
 
 // Type augmentation for globalThis to allow 'world' property
 declare global {
   // eslint-disable-next-line no-var
   var world: PhysicsWorld2D | undefined;
+  // eslint-disable-next-line no-var
+  var physicsWorld: PhysicsWorld2D | undefined;
+  // eslint-disable-next-line no-var
+  var forceCoordinator: any | undefined;
+  // eslint-disable-next-line no-var
+  var constraintSolver: any | undefined;
+  // eslint-disable-next-line no-var
+  var robustnessManager: any | undefined;
+  // eslint-disable-next-line no-var
+  var boundaryStabilizer: any | undefined;
+  // eslint-disable-next-line no-var
+  var coordinateTransform: CoordinateTransform | undefined;
 }
 
 // === PIXIJS RENDERER SETUP ===
 import * as PIXI from 'pixi.js';
 
-console.log('[DEBUG] main.ts script loaded');
+DebugLogger.log('system-event', '[main.ts] script loaded', {});
+
+// Initialize debugLogger IMMEDIATELY for browser console access
+DebugLogger.enableFileLogging(true);
+DebugLogger.setLevel('info');
+DebugLogger.initializeBrowserLogging();
+DebugLogger.log('system-event', '[main.ts] DebugLogger initialized - try typing "debugLogger.test()" in console', {});
 
 // === STATE MANAGEMENT ===
 export interface SimulationState {
@@ -41,15 +62,52 @@ export interface SimulationState {
   desiredNumCols: number;
   desiredNumRows: number;
   margin: number;
+  // Physics parameters
+  springFrequency?: number;
+  dampingRatio?: number;
+  globalMass?: number;
+  globalRestLength?: number;
+  globalInteractionStrength?: number;
+  gravity?: { x: number; y: number };
+  gravityX?: number;
+  gravityY?: number;
+  // Simulation settings
+  speed?: number;
+  maxFps?: number;
+  enableMooneyRivlin?: boolean;
+  mooneyDamping?: number;
+  mooneyMaxForce?: number;
+  enableForceCoordination?: boolean;
+  materialModelMode?: 'springs-primary' | 'mooney-primary' | 'hybrid';
+  energyBudgetLimit?: number;
+  forceRealismScale?: number;
 }
 const simState = new StateManager<SimulationState>({
   maskRegions: [],
-  defaultParams: { mass: 1, springFrequency: 2.0, dampingRatio: 0.1 }, // Use config values for consistency
+  defaultParams: { mass: SIM_CONFIG.globalMass, springFrequency: SIM_CONFIG.springFrequency, dampingRatio: SIM_CONFIG.dampingRatio },
   smoothingFrames: 5,
   desiredCellSpacing: SIM_CONFIG.desiredCellSpacing,
   desiredNumCols: SIM_CONFIG.desiredNumCols,
   desiredNumRows: SIM_CONFIG.desiredNumRows,
   margin: SIM_CONFIG.margin,
+  // Initialize with config defaults
+  springFrequency: SIM_CONFIG.springFrequency,
+  dampingRatio: SIM_CONFIG.dampingRatio,
+  globalMass: SIM_CONFIG.globalMass,
+  globalRestLength: SIM_CONFIG.globalRestLength,
+  globalInteractionStrength: SIM_CONFIG.globalInteractionStrength,
+  gravity: SIM_CONFIG.gravity,
+  gravityX: SIM_CONFIG.gravity.x,
+  gravityY: SIM_CONFIG.gravity.y,
+  speed: 1,
+  maxFps: SIM_CONFIG.maxFps,
+  enableMooneyRivlin: SIM_CONFIG.enableMooneyRivlin,
+  mooneyDamping: SIM_CONFIG.mooneyDamping,
+  mooneyMaxForce: SIM_CONFIG.mooneyMaxForce,
+  enableForceCoordination: SIM_CONFIG.enableForceCoordination,
+  materialModelMode: SIM_CONFIG.materialModelMode,
+  energyBudgetLimit: SIM_CONFIG.energyBudgetLimit,
+  forceRealismScale: SIM_CONFIG.forceRealismScale,
 });
 
 // === MAIN APP SETUP ===
@@ -86,14 +144,37 @@ function setupPluginSystem(): PluginSystem {
 }
 
 function setupUIController(coordinator: SimulationCoordinator, simState: StateManager<SimulationState>, eventBus: EventBus): UIController {
-  return new UIController(coordinator, 'ui-panel', simState, eventBus);
+  // Remove legacy panel mount if present
+  // Mount the new parameter drawer with state and eventBus
+  const drawer = document.getElementById('parameter-panel-mount');
+  if (drawer) {
+    new ParameterDrawer(drawer, simState, eventBus);
+    // Force overlay style for the parameter drawer
+    drawer.style.position = 'fixed';
+    drawer.style.top = '0';
+    drawer.style.right = '0';
+    drawer.style.width = '420px';
+    drawer.style.maxWidth = '90vw';
+    drawer.style.height = '100vh';
+    drawer.style.zIndex = '10010';
+    drawer.style.pointerEvents = 'auto';
+    drawer.style.overflowY = 'auto';
+    drawer.style.background = 'rgba(255,255,255,0.96)';
+    drawer.style.borderLeft = '1.5px solid #e0b97d';
+    drawer.style.boxShadow = '-8px 0 32px 0 rgba(60,60,60,0.13)';
+    drawer.style.borderRadius = '12px 0 0 12px';
+    drawer.style.backdropFilter = 'blur(2px)';
+    drawer.style.padding = '0 0 0 0';
+  }
+  return new UIController(coordinator, undefined, simState, eventBus);
 }
 
-function setupUserInteractionController(canvas: HTMLCanvasElement | null | undefined, body: HexSoftBody, world: PhysicsWorld2D): UserInteractionController | null {
+function setupUserInteractionController(canvas: HTMLCanvasElement | null | undefined, body: HexSoftBody, world: PhysicsWorld2D, coordinateTransform: CoordinateTransform): UserInteractionController | null {
   if (canvas) {
     return new UserInteractionController(
       () => body,
-      () => world
+      () => world,
+      coordinateTransform
     );
   } else {
     console.warn('[UserInteractionController] Could not find canvas for interaction.');
@@ -115,6 +196,7 @@ let current = {
   userInteractionController: null as UserInteractionController | null,
   animationId: 0 as number,
   eventBus: null as EventBus | null,
+  coordinateTransform: null as CoordinateTransform | null,
 };
 
 function destroySimulation() {
@@ -157,16 +239,51 @@ export async function initSimulation(params?: Partial<SimulationState>) {
   };
   const width = window.innerWidth;
   const height = window.innerHeight;
-  const body = HexGridFactory.createHexSoftBodyToFitCanvas(width, height, spacing, cellParams, margin, numCols, numRows);
+  
+  // COORDINATE SYSTEM FIX: Initialize coordinate transform BEFORE creating the grid
+  const coordinateTransform = new CoordinateTransform(width, height, 20); // 20 units wide physics world
+  current.coordinateTransform = coordinateTransform;
+  globalThis.coordinateTransform = coordinateTransform;
+  
+  DebugLogger.log('system-event', 'Coordinate system initialized', {
+    type: 'coordinate_system_init',
+    screenSize: { width, height },
+    physicsSize: coordinateTransform.getPhysicsBounds(),
+    scaling: coordinateTransform.getScaling()
+  });
+  
+  // Create the grid in normalized physics coordinates
+  const body = HexGridFactory.createHexSoftBodyWithTransform(coordinateTransform, spacing, cellParams, margin, numCols, numRows);
   current.body = body;
   if (body.nodes && body.nodes.length > 0) (globalThis as any)._debugFirstNode = body.nodes[0];
   const world = new PhysicsWorld2D();
-  world.gravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
+  
+  // COORDINATE SYSTEM FIX: Convert gravity to physics coordinates
+  const screenGravity = { 
+    x: state.gravityX ?? state.gravity?.x ?? SIM_CONFIG.gravity.x, 
+    y: state.gravityY ?? state.gravity?.y ?? SIM_CONFIG.gravity.y 
+  };
+  
+  // Convert gravity from screen coordinates to physics coordinates
+  const physicsGravity = coordinateTransform.screenVelocityToPhysics(screenGravity.x, screenGravity.y);
+  world.gravity = physicsGravity;
+  
+  // Set ground level in physics coordinates (bottom of physics world)
+  const physicsBounds = coordinateTransform.getPhysicsBounds();
+  world.groundY = physicsBounds.height * 0.95; // 95% down from top
+  
+  DebugLogger.log('system-event', 'Physics world initialized', {
+    type: 'physics_world_init',
+    screenGravity,
+    physicsGravity,
+    physicsGroundY: world.groundY,
+    physicsBounds
+  });
   current.world = world;
-  const userInteractionController = setupUserInteractionController(canvas, body, world);
+  const userInteractionController = setupUserInteractionController(canvas, body, world, coordinateTransform);
   current.userInteractionController = userInteractionController;
-  const hexGridView = new HexGridView(body.cells, userInteractionController!);
-  const springView = new SpringView(body.springs);
+  const hexGridView = new HexGridView(body.cells, userInteractionController!, coordinateTransform);
+  const springView = new SpringView(body.springs, coordinateTransform);
   renderer.addLayer('hexGrid', hexGridView);
   renderer.addLayer('springs', springView);
   current.hexGridView = hexGridView;
@@ -181,12 +298,82 @@ export async function initSimulation(params?: Partial<SimulationState>) {
     uiController.setUserInteractionController(userInteractionController);
   }
   current.uiController = uiController;
+  
+  // Apply all preserved parameters to the new simulation
+  if (state.globalMass !== undefined) {
+    for (const node of body.nodes) {
+      node.mass = state.globalMass;
+    }
+  }
+  if (state.springFrequency !== undefined) {
+    for (const spring of body.springs) {
+      spring.springFrequency = state.springFrequency;
+    }
+  }
+  if (state.dampingRatio !== undefined) {
+    for (const spring of body.springs) {
+      spring.dampingRatio = state.dampingRatio;
+    }
+  }
+  // Apply globalRestLength as a scale factor to all spring rest lengths
+  // This allows dynamic adjustment while preserving the relative proportions
+  if (state.globalRestLength !== undefined && state.globalRestLength !== 1.0) {
+    for (const spring of body.springs) {
+      // Scale the existing rest length rather than overriding it completely
+      spring.restLength *= state.globalRestLength;
+    }
+  }
+  if (state.globalInteractionStrength !== undefined && typeof body.setGlobalInteractionStrength === 'function') {
+    body.setGlobalInteractionStrength(state.globalInteractionStrength);
+  }
+  if (state.enableMooneyRivlin !== undefined) {
+    for (const cell of body.cells) {
+      cell.mooneyC1 = state.enableMooneyRivlin ? 1.0 : 0.0;
+      cell.mooneyC2 = state.enableMooneyRivlin ? 0.2 : 0.0;
+    }
+  }
+  if (state.mooneyDamping !== undefined) {
+    for (const cell of body.cells) {
+      cell.mooneyDamping = state.mooneyDamping;
+    }
+  }
+  if (state.mooneyMaxForce !== undefined) {
+    for (const cell of body.cells) {
+      cell.mooneyMaxForce = state.mooneyMaxForce;
+    }
+  }
+  
+  // The speed and maxFps will be applied through the parameter change event system
+  // when the UIController processes the current state
+  
+  // Re-emit current state to ensure all parameters are properly applied
+  // This will trigger the UIController's parameter change handlers
+  eventBus.emit('parameterChange', {
+    speed: state.speed,
+    maxFps: state.maxFps,
+    // Add any other parameters that need to be re-applied through the event system
+  });
+  
+  if (state.enableForceCoordination !== undefined || 
+      state.materialModelMode !== undefined || 
+      state.energyBudgetLimit !== undefined) {
+    SimulationStepper.updateForceCoordinationConfig({
+      enableCoordination: state.enableForceCoordination,
+      materialModelMode: state.materialModelMode,
+      energyBudgetLimit: state.energyBudgetLimit
+    });
+  }
+  
   // Animation loop
   isSimulationCrashed = false;
   let lastFrameTime = 0;
   let adaptiveFps = current.uiController?.simulationMaxFps ?? (SIM_CONFIG.maxFps ?? 60);
   let slowFrameCount = 0;
   let fastFrameCount = 0;
+  // Performance tracking for real-world feedback
+  let lastFpsLog = performance.now();
+  let frameCount = 0;
+
   function animate(now?: number) {
     if (isSimulationCrashed) return;
     const maxFps = adaptiveFps;
@@ -232,6 +419,25 @@ export async function initSimulation(params?: Partial<SimulationState>) {
       }
       lastFrameTime = time;
     }
+    
+    // Log performance metrics every 2 seconds for analysis
+    if (time - lastFpsLog > 2000) {
+      const fps = frameCount / ((time - lastFpsLog) / 1000);
+      
+      DebugLogger.log('performance', 'Frame rate metrics', {
+        timestamp: time,
+        frameTime: frameTime,
+        fps: fps,
+        nodeCount: current.body?.nodes.length || 0,
+        springCount: current.body?.springs.length || 0,
+        interactionActive: current.userInteractionController?.hasActiveInteraction() || false
+      });
+      
+      frameCount = 0;
+      lastFpsLog = time;
+    }
+    
+    frameCount++;
     current.animationId = requestAnimationFrame(animate);
   }
   animate();
@@ -241,6 +447,15 @@ export async function initSimulation(params?: Partial<SimulationState>) {
 (window as any).resetSimulation = () => initSimulation();
 (window as any).resetSimulationWithParams = (params: Partial<SimulationState>) => initSimulation(params);
 
+// Expose mesh stabilizer and shape enforcer for debugging
+(window as any).SimulationStepper = SimulationStepper;
+(window as any).getMeshStabilizationStats = () => {
+  return SimulationStepper.getPublicMeshStabilizer().getMeshStabilizationStats();
+};
+(window as any).getShapeEnforcementStats = () => {
+  return SimulationStepper.getPublicShapeEnforcer().getEnforcementStats(current.world?.bodies || []);
+};
+
 // For integration tests: export an initApp function
 export async function initApp({ canvas, overlay, uiPanel }: { canvas: HTMLCanvasElement, overlay: HTMLCanvasElement, uiPanel: HTMLElement }) {
   // Minimal headless setup for integration tests
@@ -248,15 +463,23 @@ export async function initApp({ canvas, overlay, uiPanel }: { canvas: HTMLCanvas
   const defaultParams = { mass: 0.01, springFrequency: 8.0, dampingRatio: 0.02 };
   const margin = 40;
   const spacing = computeCellSpacingForGrid(canvas.width, canvas.height, 20, 15, margin);
-  const body = HexGridFactory.createHexSoftBodyToFitCanvas(canvas.width, canvas.height, spacing, defaultParams, margin);
+  
+  // COORDINATE SYSTEM FIX: Use coordinate transform for tests too
+  const coordinateTransform = new CoordinateTransform(canvas.width, canvas.height, 20);
+  const body = HexGridFactory.createHexSoftBodyWithTransform(coordinateTransform, spacing, defaultParams, margin, 20, 15);
+  
   globalThis.world = new PhysicsWorld2D();
-  globalThis.world.gravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
-  const userInteractionController = new UserInteractionController(() => body, () => globalThis.world!);
-  const hexGridView = new HexGridView(body.cells, userInteractionController);
-  const springView = new SpringView(body.springs);
+  // Convert gravity to physics coordinates
+  const screenGravity = { x: SIM_CONFIG.gravity.x, y: SIM_CONFIG.gravity.y };
+  const physicsGravity = coordinateTransform.screenVelocityToPhysics(screenGravity.x, screenGravity.y);
+  globalThis.world.gravity = physicsGravity;
+  
+  const userInteractionController = new UserInteractionController(() => body, () => globalThis.world!, coordinateTransform);
+  const hexGridView = new HexGridView(body.cells, userInteractionController, coordinateTransform);
+  const springView = new SpringView(body.springs, coordinateTransform);
   renderer.addLayer('hexGrid', hexGridView);
   renderer.addLayer('springs', springView);
-  return { renderer, hexGridView, springView, body };
+  return { renderer, hexGridView, springView, body, coordinateTransform };
 }
 
 // Add robust error logging and step-by-step debug output
@@ -269,4 +492,17 @@ export async function initApp({ canvas, overlay, uiPanel }: { canvas: HTMLCanvas
     console.error('[ERROR] main.ts: start() failed:', err);
   }
 })();
+
+export async function start() {
+  DebugLogger.log('system-event', '[main.ts] Invoking start()', {});
+  
+  // Debug logging is already initialized at the top of main.ts
+
+  try {
+    await initSimulation();
+    DebugLogger.log('system-event', '[main.ts] Simulation initialized successfully', {});
+  } catch (err) {
+    DebugLogger.log('system-event', '[main.ts] Simulation initialization failed', { error: err });
+  }
+}
 

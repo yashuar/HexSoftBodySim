@@ -3,11 +3,16 @@
 
 import { SimulationCoordinator } from '../application/SimulationCoordinator';
 import { MaskRegion } from '../application/MaskParser';
-import { ParameterPanel, ParameterChange } from './ParameterPanel';
+// ParameterPanel import and usage removed for UI rebuild
+// import { ParameterPanel, ParameterChange } from './ParameterPanel';
 import { StateManager } from '../infrastructure/StateManager';
 import { CellParameters } from '../domain/CellParameters';
 import { EventBus } from '../infrastructure/EventBus';
+
+import { SimulationStepper } from '../domain/SimulationStepper';
 import { SIM_CONFIG } from '../config';
+import { SimulationState } from '../main';
+import { DebugLogger } from '../infrastructure/DebugLogger';
 
 export class UIController {
   private userInteractionController?: { applyInteractionForces: () => any, getActiveAreaConstraints?: () => any[] };
@@ -38,27 +43,26 @@ export class UIController {
   private coordinator: SimulationCoordinator;
   private maskRegions: MaskRegion[] = [];
   private isPaused: boolean = false;
-  private uiPanel: HTMLElement | null;
-  private parameterPanel: ParameterPanel | null = null;
+  
   private speed: number = 1;
   private maxFps: number = 60;
   // Accept a generic StateManager type for broader compatibility
   private simState: StateManager<any>;
   private eventBus?: EventBus;
 
-  constructor(coordinator: SimulationCoordinator, uiPanelId: string = 'ui-panel', simState?: StateManager<any>, eventBus?: EventBus) {
+  constructor(coordinator: SimulationCoordinator, uiPanelId: string = 'parameter-panel-mount', simState?: StateManager<any>, eventBus?: EventBus) {
     this.coordinator = coordinator;
-    this.uiPanel = document.getElementById(uiPanelId);
     this.simState = simState ?? new StateManager({ defaultParams: { mass: 1, stiffness: 1, damping: 0.01 }, smoothingFrames: 5 });
     this.eventBus = eventBus;
-    this.setupUI();
-    // Mount ParameterPanel into #parameter-panel-mount only
-    const paramPanelMount = document.getElementById('parameter-panel-mount');
-    this.parameterPanel = new ParameterPanel(paramPanelMount ?? document.body, this.simState, this.eventBus);
+
+
+    // Listen for simulation control events
     if (this.eventBus) {
+      this.eventBus.on('ui:togglePause', () => this.togglePause());
+      this.eventBus.on('ui:reset', () => this.reset());
       this.eventBus.on('pluginError', (err) => {
         // Display or log plugin errors in the UI
-        console.error('[UIController] Plugin error:', err);
+        DebugLogger.log('system-event', '[UIController] Plugin error', { error: err });
         alert('A plugin error occurred. See console for details.');
       });
       this.eventBus.on('parameterChange', (change) => {
@@ -88,9 +92,16 @@ export class UIController {
           const prev = this.simState.get().defaultParams;
           this.simState.set({ defaultParams: { ...prev, mass: change.globalMass } });
         }
-        if (change.globalRestLength !== undefined) {
+        // Apply globalRestLength as a scale factor to all spring rest lengths  
+        // This allows dynamic adjustment while preserving the relative proportions
+        if (change.globalRestLength !== undefined && change.globalRestLength !== 1.0) {
           for (const spring of this.coordinator.body.springs) {
-            spring.restLength = change.globalRestLength;
+            // Reset to original calculated rest length first if we stored it
+            if (!spring.originalRestLength) {
+              spring.originalRestLength = spring.restLength;
+            }
+            // Scale the original rest length rather than compounding scaling
+            spring.restLength = spring.originalRestLength * change.globalRestLength;
           }
         }
         if (change.globalInteractionStrength !== undefined) {
@@ -98,6 +109,25 @@ export class UIController {
           if (typeof this.coordinator.body.setGlobalInteractionStrength === 'function') {
             this.coordinator.body.setGlobalInteractionStrength(change.globalInteractionStrength);
           }
+        }
+        // --- NEW: Handle all other parameter changes for live simulation sync ---
+        if (change.globalPressure !== undefined) {
+          this.coordinator.world.globalPressure = change.globalPressure;
+        }
+        if (change.gravity !== undefined && typeof change.gravity === 'object') {
+          this.coordinator.world.gravity = { x: change.gravity.x, y: change.gravity.y };
+        }
+        if (change.forceRealismScale !== undefined) {
+          // No setForceRealismScale on body; only propagate to userInteractionController
+          if (this.userInteractionController && typeof (this.userInteractionController as any).setForceRealismScale === 'function') {
+            (this.userInteractionController as any).setForceRealismScale(change.forceRealismScale);
+          }
+          if (this.userInteractionController && typeof (this.userInteractionController as any).setForceRealismScale === 'function') {
+            (this.userInteractionController as any).setForceRealismScale(change.forceRealismScale);
+          }
+        }
+        if (change.enableGround !== undefined) {
+          this.coordinator.world.enableGround = change.enableGround;
         }
         if (change.gravityX !== undefined || change.gravityY !== undefined) {
           const gx = change.gravityX !== undefined ? change.gravityX : SIM_CONFIG.gravity.x;
@@ -147,6 +177,22 @@ export class UIController {
             (window as any).showSnackbar('Grid changes require simulation reset to take effect');
           }
         }
+        if (change.enableForceCoordination !== undefined || 
+            change.materialModelMode !== undefined || 
+            change.energyBudgetLimit !== undefined) {
+          // Force coordination changes - update the SimulationStepper's force coordinator
+          SimulationStepper.updateForceCoordinationConfig({
+            enableCoordination: change.enableForceCoordination,
+            materialModelMode: change.materialModelMode,
+            energyBudgetLimit: change.energyBudgetLimit
+          });
+          
+          DebugLogger.log('system-event', '[UIController] Force coordination settings updated live', {
+            enableForceCoordination: change.enableForceCoordination,
+            materialModelMode: change.materialModelMode,
+            energyBudgetLimit: change.energyBudgetLimit
+          });
+        }
       });
     }
   }
@@ -184,20 +230,34 @@ export class UIController {
   reset(): void {
     const state = this.simState.get();
     
+    // Always preserve all current parameter values when resetting
+    const preservedState: Partial<SimulationState> = {
+      ...state,
+      // Ensure defaultParams reflects current UI values - use live values if available
+      defaultParams: {
+        mass: state.globalMass ?? state.defaultParams.mass,
+        springFrequency: state.springFrequency ?? state.defaultParams.springFrequency,
+        dampingRatio: state.dampingRatio ?? state.defaultParams.dampingRatio
+      }
+    };
+    
+    // Update the state manager with all preserved values before reset
+    this.simState.set(preservedState);
+    
     // Check if grid structure needs rebuilding
     const needsGridRebuild = this.needsGridRebuild(state);
     
     if (needsGridRebuild) {
-      // Full reset for grid structure changes
-      (window as any).resetSimulationWithParams?.(state);
+      // Full reset for grid structure changes, preserving all parameters
+      (window as any).resetSimulationWithParams?.(preservedState);
       if (typeof (window as any).showSnackbar === 'function') {
-        (window as any).showSnackbar('Simulation reset with new grid layout');
+        (window as any).showSnackbar('Simulation reset with new grid layout, parameters preserved');
       }
     } else {
       // Soft reset - just reset physics state without rebuilding grid
       this.softReset();
       if (typeof (window as any).showSnackbar === 'function') {
-        (window as any).showSnackbar('Physics state reset to default positions');
+        (window as any).showSnackbar('Physics state reset to default positions, parameters preserved');
       }
     }
   }
@@ -229,31 +289,12 @@ export class UIController {
   }
 
   // Handle parameter slider changes
-  private handleParameterChange(change: ParameterChange) {
-    // No-op: handled by StateManager subscription
-  }
+  // private handleParameterChange(change: ParameterChange) {
+  //   // No-op: handled by StateManager subscription
+  // }
 
   // Set up UI controls and wire up events
-  private setupUI(): void {
-    // Pause/Resume
-    const pauseBtn = document.getElementById('pause-btn');
-    if (pauseBtn) {
-      pauseBtn.onclick = () => this.togglePause();
-    }
-    // Reset
-    const resetBtn = document.getElementById('reset-btn');
-    if (resetBtn) {
-      resetBtn.onclick = () => this.reset();
-    }
-    // Add Mask
-    const addMaskBtn = document.getElementById('add-mask-btn');
-    if (addMaskBtn) {
-      addMaskBtn.onclick = () => {
-        // Placeholder: In a real app, would open mask editor or add a default region
-        alert('Mask editing not yet implemented.');
-      };
-    }
-  }
+
 
   get simulationSpeed(): number {
     return this.speed;

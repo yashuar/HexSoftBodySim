@@ -13,14 +13,14 @@ export class CellParameterUtils {
     let blended: CellParameters = { ...defaultParams };
     for (const { params, weight } of blendList) {
       if (params.mass !== undefined) blended.mass += params.mass * weight;
-      if (params.stiffness !== undefined) blended.stiffness += params.stiffness * weight;
-      if (params.damping !== undefined) blended.damping += params.damping * weight;
+      if (params.springFrequency !== undefined) blended.springFrequency += params.springFrequency * weight;
+      if (params.dampingRatio !== undefined) blended.dampingRatio += params.dampingRatio * weight;
       totalWeight += weight;
     }
     if (totalWeight > 0) {
       blended.mass /= totalWeight;
-      blended.stiffness /= totalWeight;
-      blended.damping /= totalWeight;
+      blended.springFrequency /= totalWeight;
+      blended.dampingRatio /= totalWeight;
     }
     return blended;
   }
@@ -33,15 +33,15 @@ export class CellParameterUtils {
       cell.updateParameters(target);
       return;
     }
-    const start: CellParameters = { mass: cell.mass, stiffness: cell.stiffness, damping: cell.damping };
+    const start: CellParameters = { mass: cell.mass, springFrequency: cell.stiffness, dampingRatio: cell.damping };
     let frame = 0;
     function step() {
       frame++;
       const t = Math.min(frame / smoothingFrames, 1);
       cell.updateParameters({
         mass: start.mass + (target.mass - start.mass) * t,
-        stiffness: start.stiffness + (target.stiffness - start.stiffness) * t,
-        damping: start.damping + (target.damping - start.damping) * t,
+        springFrequency: start.springFrequency + (target.springFrequency - start.springFrequency) * t,
+        dampingRatio: start.dampingRatio + (target.dampingRatio - start.dampingRatio) * t,
       });
       if (frame < smoothingFrames) {
         requestAnimationFrame(step);

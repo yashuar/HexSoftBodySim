@@ -1,4 +1,5 @@
 import { Application, Container, Ticker } from 'pixi.js';
+import { DebugLogger } from '../../infrastructure/DebugLogger';
 
 /**
  * Robust, modular PixiJS renderer for 2D physics engine visualizations.
@@ -30,9 +31,9 @@ export class PixiRenderer2D {
         this.app.stage.interactive = true;
         this.app.stage.on('pointerdown', (event: any) => {
             const { x, y } = event;
-            console.log('[PIXI][DEBUG] pointerdown at', x, y, event.target);
+            DebugLogger.log('user-interaction', '[PixiRenderer2D] pointerdown', { x, y, target: event.target });
         });
-        console.log('[PIXI][DEBUG] Stage interactivity enabled and pointerdown handler attached.');
+        DebugLogger.log('user-interaction', '[PixiRenderer2D] Stage interactivity enabled and pointerdown handler attached.', {});
     }
 
     /**

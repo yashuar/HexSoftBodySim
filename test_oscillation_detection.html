@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oscillation Detection Test - PhysicsEngine2D</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+        
+        #instructions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: yellow;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+        
+        #console-output {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #00ff00;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 10px;
+            max-width: 600px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Oscillation Detection Test</h3>
+        <div>This test monitors boundary oscillation detection and damping.</div>
+        <div>Status: <span id="status">Loading...</span></div>
+        <div>Force Coordination: <span id="coordination-status">Unknown</span></div>
+        <div>Boundary Damping: <span id="damping-status">Unknown</span></div>
+        <div>Oscillation Score: <span id="oscillation-score">0</span></div>
+    </div>
+    
+    <div id="instructions">
+        <h3>Instructions</h3>
+        <div>1. Wait for simulation to load</div>
+        <div>2. Interact with the soft body to create motion</div>
+        <div>3. Watch for oscillation detection in console below</div>
+        <div>4. Look for console messages about boundary damping</div>
+        <div>Press F12 to open browser console for detailed logs</div>
+    </div>
+    
+    <div id="console-output">
+        <div>Console output will appear here...</div>
+    </div>
+
+    <canvas id="canvas" style="position: absolute; top: 0; left: 0; z-index: 1;"></canvas>
+
+    <script type="module">
+        // Capture console logs and display them
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            
+            // Filter for force coordination and oscillation messages
+            const message = args.join(' ');
+            if (message.includes('ForceCoordinator') || message.includes('oscillation') || message.includes('damping') || message.includes('Spring2D')) {
+                const logDiv = document.createElement('div');
+                logDiv.textContent = new Date().toLocaleTimeString() + ': ' + message;
+                logDiv.style.margin = '2px 0';
+                
+                if (message.includes('OSCILLATION DETECTED') || message.includes('Emergency constraint')) {
+                    logDiv.style.color = '#ff4444';
+                    logDiv.style.fontWeight = 'bold';
+                } else if (message.includes('CRITICAL') || message.includes('explosion')) {
+                    logDiv.style.color = '#ff0000';
+                    logDiv.style.fontWeight = 'bold';
+                }
+                
+                consoleOutput.appendChild(logDiv);
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+                
+                // Keep only recent messages
+                while (consoleOutput.children.length > 25) {
+                    consoleOutput.removeChild(consoleOutput.firstChild);
+                }
+            }
+        };
+        
+        // Import and setup the simulation - use main.ts instead of pixiDemo
+        import('./src/main.js').then(module => {
+            console.log('[Test] Main module loaded successfully');
+            document.getElementById('status').textContent = 'Running';
+        }).catch(error => {
+            console.error('[Test] Failed to start simulation:', error);
+            document.getElementById('status').textContent = 'Error: ' + error.message;
+        });
+        
+        // Update status indicators
+        function updateStatus() {
+            // Try to get force coordination status from global scope
+            if (window.physicsWorld) {
+                document.getElementById('coordination-status').textContent = 'Active';
+            }
+            
+            // Try to get oscillation score
+            if (window.forceCoordinator && window.forceCoordinator.getOscillationScore) {
+                const score = window.forceCoordinator.getOscillationScore();
+                document.getElementById('oscillation-score').textContent = score.toFixed(3);
+            }
+        }
+        
+        // Update status every second
+        setInterval(updateStatus, 1000);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('canvas');
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -2,9 +2,14 @@ import { PointMass2D } from '../domain/PointMass2D';
 import { HexCell } from '../domain/HexCell';
 import { VolumeConstraint2D } from '../domain/constraints/VolumeConstraint2D';
 import { SIM_CONFIG } from '../config';
+import { DebugLogger } from '../infrastructure/DebugLogger';
 
 // DistributedUserInteraction: Softly drags a node and its neighbors, preserving local area
 export class DistributedUserInteraction {
+  // Dynamic force realism scale
+  private _forceRealismScale: number = SIM_CONFIG.forceRealismScale;
+  setForceRealismScale(val: number) { this._forceRealismScale = val; }
+  getForceRealismScale() { return this._forceRealismScale; }
   mainNode: PointMass2D;
   neighborNodes: PointMass2D[];
   target: { x: number; y: number };
@@ -59,6 +64,16 @@ export class DistributedUserInteraction {
   startRelease() {
     this.isReleasing = true;
     this.releaseTimer = 0;
+    
+    // Immediately reduce momentum when release starts
+    this.mainNode.velocity.x *= 0.3;
+    this.mainNode.velocity.y *= 0.3;
+    
+    // Also dampen neighbor velocities to prevent spring oscillation
+    for (const neighbor of this.neighborNodes) {
+      neighbor.velocity.x *= 0.5;
+      neighbor.velocity.y *= 0.5;
+    }
   }
 
   updateRelease(dt: number): boolean {
@@ -72,7 +87,7 @@ export class DistributedUserInteraction {
 
   // Apply distributed directional vector-based drag force
   applyForce() {
-    console.log('[INTERACTION-DEBUG][DistributedUserInteraction] applyForce', {
+    DebugLogger.log('user-interaction', 'applyForce', {
       mainNode: this.mainNode,
       target: this.target,
       strength: this.strength,
@@ -85,12 +100,29 @@ export class DistributedUserInteraction {
       y: this.target.y - this.mainNode.position.y
     };
     
-    // Apply full force to main node in drag direction
-    this._applyDirectionalForce(this.mainNode, dragVector, this.strength);
+    // Apply stronger force to main node to ensure springs can transmit effectively
+    this._applyDirectionalForce(this.mainNode, dragVector, this.strength * 1.2);
     
-    // Apply reduced force to neighbors in the same direction
-    for (const n of this.neighborNodes) {
-      this._applyDirectionalForce(n, dragVector, this.strength * 0.4); // Increased neighbor influence for more cohesive drag
+    // Apply gentle assistance to neighbors to help springs transmit force
+    // This supplements spring force rather than replacing it
+    for (const neighbor of this.neighborNodes) {
+      // Calculate spring extension direction (from neighbor toward main node)
+      const springVector = {
+        x: this.mainNode.position.x - neighbor.position.x,
+        y: this.mainNode.position.y - neighbor.position.y
+      };
+      
+      const dist = Math.sqrt(springVector.x * springVector.x + springVector.y * springVector.y);
+      if (dist > 0.01) {
+        // Normalize and apply gentle assistance in spring direction
+        const normalizedSpring = {
+          x: springVector.x / dist,
+          y: springVector.y / dist
+        };
+        
+        // Small force to help springs overcome initial inertia
+        this._applyDirectionalForce(neighbor, normalizedSpring, this.strength * 0.15);
+      }
     }
     
     // Note: Volume preservation is handled by global constraint system, not here
@@ -112,10 +144,9 @@ export class DistributedUserInteraction {
     let fx = dragVector.x * strength * 0.02; // Much stronger force to compete with springs
     let fy = dragVector.y * strength * 0.02;
     
-    // Apply force realism scaling from config
-    const realismScale = SIM_CONFIG.forceRealismScale;
-    fx *= realismScale;
-    fy *= realismScale;
+    // Apply force realism scaling (dynamic)
+    fx *= this._forceRealismScale;
+    fy *= this._forceRealismScale;
     
     // Clamp total force magnitude
     const maxForce = this.maxPointerForce;
@@ -141,12 +172,25 @@ export class DistributedUserInteraction {
       DistributedUserInteraction.lastForceLog = now;
     }
     
-    // Apply moderate velocity damping during drag to allow some momentum but prevent excessive buildup
-    const dampingFactor = this.isReleasing ? 0.85 : 0.9; // Less damping during drag for responsiveness
+    // Apply progressive velocity damping during interaction and stronger damping during release
+    let dampingFactor: number;
+    let forceScale = 1.0;
+    
+    if (this.isReleasing) {
+      // During release: strong damping and reduced force
+      const releaseProgress = this.releaseTimer / this.releaseDuration;
+      dampingFactor = 0.6 - (releaseProgress * 0.3); // Start at 0.6, reduce to 0.3 (strong damping)
+      forceScale = Math.max(0, 1.0 - releaseProgress * 2); // Quickly reduce force to zero
+    } else {
+      // During active drag: moderate damping for responsiveness
+      dampingFactor = 0.92;
+    }
+    
     node.velocity.x *= dampingFactor;
     node.velocity.y *= dampingFactor;
     
-    node.applyForce({ x: fx, y: fy });
+    // Apply scaled force
+    node.applyForce({ x: fx * forceScale, y: fy * forceScale });
   }
 
   /**
@@ -182,30 +226,30 @@ export class DistributedUserInteraction {
       }
     }
     
-    console.group("🔬 [FORCE ANALYSIS] User Interaction Forces vs. Biological Reality");
-    console.log(`📊 Force Statistics (last ${forces.length} samples):`);
-    console.log(`   Average: ${avgForce.toFixed(1)} N`);
-    console.log(`   Range: ${minForce.toFixed(1)} - ${maxForce.toFixed(1)} N`);
-    console.log(`   Closest biological equivalent: ${closestMatch}`);
-    console.log(`📏 Biological Force Ranges:`);
-    console.log(`   Light touch: 0.5-2 N`);
-    console.log(`   Firm press: 5-20 N`);
-    console.log(`   Strong press: 20-50 N`);
-    console.log(`   Medical palpation: 5-25 N`);
-    console.log(`   Surgical manipulation: 50-200 N`);
-    
-    // Provide scaling recommendations
+    DebugLogger.log('user-interaction', 'Force Statistics', {
+      count: forces.length,
+      avg: avgForce,
+      min: minForce,
+      max: maxForce,
+      closestMatch
+    });
+    DebugLogger.log('user-interaction', 'Biological Force Ranges', {
+      light: '0.5-2 N',
+      firm: '5-20 N',
+      strong: '20-50 N',
+      palpation: '5-25 N',
+      surgical: '50-200 N'
+    });
     if (avgForce > 50) {
-      console.log(`💡 Current forces feel like: Medical/surgical manipulation`);
-      console.log(`   For realistic finger touch, reduce forces by ${(avgForce / 10).toFixed(1)}x`);
+      DebugLogger.log('user-interaction', 'Current forces feel like: Medical/surgical manipulation', { avgForce });
+      DebugLogger.log('user-interaction', 'For realistic finger touch, reduce forces', { factor: (avgForce / 10).toFixed(1) });
     } else if (avgForce > 20) {
-      console.log(`💡 Current forces feel like: Strong finger pressure`);
-      console.log(`   For light touch, reduce forces by ${(avgForce / 2).toFixed(1)}x`);
+      DebugLogger.log('user-interaction', 'Current forces feel like: Strong finger pressure', { avgForce });
+      DebugLogger.log('user-interaction', 'For light touch, reduce forces', { factor: (avgForce / 2).toFixed(1) });
     } else if (avgForce > 5) {
-      console.log(`💡 Current forces feel like: Firm finger pressure (realistic!)`);
+      DebugLogger.log('user-interaction', 'Current forces feel like: Firm finger pressure (realistic!)', { avgForce });
     } else {
-      console.log(`💡 Current forces feel like: Light finger touch (very realistic!)`);
+      DebugLogger.log('user-interaction', 'Current forces feel like: Light finger touch (very realistic!)', { avgForce });
     }
-    console.groupEnd();
   }
 }
